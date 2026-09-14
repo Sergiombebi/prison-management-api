@@ -14,6 +14,11 @@
       "key": "token",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "detenu_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -176,7 +181,12 @@
                 "exec": [
                   "pm.test('Status code is 201', function () {",
                   "    pm.response.to.have.status(201);",
-                  "});"
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id', body.data.id);",
+                  "}"
                 ]
               }
             }
@@ -256,6 +266,154 @@
               "path": ["detenus"]
             },
             "description": "Cas d'erreur : numéro d'écrou déjà utilisé -> 422 avec message explicite."
+          }
+        },
+        {
+          "name": "Lister les détenus (paginé)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('10 par page maximum', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.length).to.be.at.most(10);",
+                  "    pm.expect(body.meta.per_page).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus?page=1",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"],
+              "query": [{ "key": "page", "value": "1" }]
+            },
+            "description": "Liste paginée (10 détenus par page), vue résumée (sans les données sensibles complètes). `meta.total`, `meta.last_page` etc. permettent de construire la pagination côté frontend. Changez `page` pour naviguer."
+          }
+        },
+        {
+          "name": "Détails d'un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}"]
+            },
+            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection."
+          }
+        },
+        {
+          "name": "Modifier un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "_method", "value": "PUT", "type": "text", "description": "Obligatoire pour l'upload de fichiers : PHP ne lit pas le multipart en PUT direct. On POST avec ce champ, Laravel route vers la mise à jour." },
+                { "key": "numero_ecrou", "value": "2026-000123", "type": "text" },
+                { "key": "nom", "value": "Mballa Jean-Pierre", "type": "text", "description": "Exemple de champ modifié" },
+                { "key": "sexe", "value": "Masculin", "type": "text" },
+                { "key": "date_naissance", "value": "1990-05-14", "type": "text" },
+                { "key": "lieu_naissance", "value": "Yaoundé", "type": "text" },
+                { "key": "nationalite", "value": "Cameroun", "type": "text" },
+                { "key": "profession", "value": "Menuisier", "type": "text" },
+                { "key": "nom_pere", "value": "Mballa Pierre", "type": "text" },
+                { "key": "nom_mere", "value": "Ateba Marie", "type": "text" },
+                { "key": "numero_cni", "value": "100200300", "type": "text" },
+                { "key": "contact_urgence_nom", "value": "Ateba Paul", "type": "text" },
+                { "key": "contact_urgence_lien_parente", "value": "Frère", "type": "text" },
+                { "key": "contact_urgence_telephone", "value": "699999999", "type": "text" },
+                { "key": "photo_face", "type": "file", "src": [], "description": "Optionnel : ne fournir que si vous voulez remplacer la photo (l'ancienne est supprimée de Cloudinary)" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}"]
+            },
+            "description": "Met à jour la fiche complète d'un détenu (tous les champs obligatoires doivent être renvoyés, comme un nouveau formulaire soumis). numero_ecrou/numero_cni/numero_passeport restent uniques mais ignorent le détenu courant."
+          }
+        },
+        {
+          "name": "Supprimer (désactiver) un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('est_present passe à false', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.est_present).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}"]
+            },
+            "description": "Ne supprime jamais la ligne en base : passe est_present à false (le détenu n'est plus physiquement présent, quelle que soit la raison). L'historique détaillé des sorties viendra dans une table séparée."
           }
         }
       ]
