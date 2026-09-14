@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Enums\RoleUtilisateur;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 /**
  * @extends Factory<User>
@@ -25,21 +25,33 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'nom' => fake()->lastName(),
+            'prenom' => fake()->firstName(),
+            'username' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'role' => RoleUtilisateur::Agent,
+            'est_actif' => true,
         ];
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Indicate that the user is an administrator.
      */
-    public function unverified(): static
+    public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'role' => RoleUtilisateur::Admin,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a doctor.
+     */
+    public function medecin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => RoleUtilisateur::Medecin,
         ]);
     }
 }

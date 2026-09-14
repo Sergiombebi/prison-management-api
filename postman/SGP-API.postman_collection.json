@@ -1,0 +1,264 @@
+{
+  "info": {
+    "name": "SGP API",
+    "description": "Collection API du backend SGP (Système de Gestion Pénitentiaire) — Laravel.\n\nAuthentification par token Sanctum : après un login réussi, le token est automatiquement stocké dans la variable de collection `token` et réutilisé par les requêtes protégées (header `Authorization: Bearer {{token}}`).\n\nComptes de test seedés (`php artisan db:seed`) — mot de passe commun : `password`\n- admin / admin@sgp.local (role: admin)\n- eric.agent / agent@sgp.local (role: agent)\n- sophie.medecin / medecin@sgp.local (role: medecin)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (username)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"identifiant\": \"admin\",\n    \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Connexion via le nom d'utilisateur. Stocke automatiquement le token reçu dans la variable de collection `token`."
+          }
+        },
+        {
+          "name": "Login (email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"identifiant\": \"medecin@sgp.local\",\n    \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Connexion via l'email, à la place du nom d'utilisateur. Le champ `identifiant` accepte l'un ou l'autre."
+          }
+        },
+        {
+          "name": "Login (invalid credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"identifiant\": \"admin\",\n    \"password\": \"mauvais_mot_de_passe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Cas d'erreur : identifiants invalides -> 422 avec `errors.identifiant`."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Retourne l'utilisateur authentifié courant. Nécessite le token obtenu via Login."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Révoque le token courant."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Détenus",
+      "item": [
+        {
+          "name": "Créer un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "numero_ecrou", "value": "2026-000123", "type": "text", "description": "Obligatoire, unique. Saisi librement par l'agent." },
+                { "key": "nom", "value": "Mballa Jean", "type": "text" },
+                { "key": "sexe", "value": "Masculin", "type": "text", "description": "Masculin ou Féminin" },
+                { "key": "date_naissance", "value": "1990-05-14", "type": "text" },
+                { "key": "lieu_naissance", "value": "Yaoundé", "type": "text" },
+                { "key": "nationalite", "value": "Cameroun", "type": "text" },
+                { "key": "profession", "value": "Menuisier", "type": "text" },
+                { "key": "nom_pere", "value": "Mballa Pierre", "type": "text" },
+                { "key": "nom_mere", "value": "Ateba Marie", "type": "text" },
+                { "key": "numero_cni", "value": "100200300", "type": "text", "description": "Optionnel, mais unique s'il est renseigné (détection de réincarcération)" },
+                { "key": "numero_passeport", "value": "", "type": "text" },
+                { "key": "contact_urgence_nom", "value": "Ateba Paul", "type": "text" },
+                { "key": "contact_urgence_lien_parente", "value": "Frère", "type": "text" },
+                { "key": "contact_urgence_telephone", "value": "699999999", "type": "text" },
+                { "key": "photo_face", "type": "file", "src": [] },
+                { "key": "photo_profil", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Crée une nouvelle fiche détenu. Protégé (nécessite le token). Les photos sont envoyées directement à Cloudinary ; la réponse contient les URLs publiques. Les champs numero_ecrou, numero_cni et numero_passeport doivent être uniques."
+          }
+        },
+        {
+          "name": "Créer un détenu (écrou en doublon)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "numero_ecrou", "value": "2026-000123", "type": "text", "description": "Rejouez ce test après avoir créé une première fois ce même numéro." },
+                { "key": "nom", "value": "Autre Personne", "type": "text" },
+                { "key": "sexe", "value": "Masculin", "type": "text" },
+                { "key": "date_naissance", "value": "1995-01-01", "type": "text" },
+                { "key": "lieu_naissance", "value": "Douala", "type": "text" },
+                { "key": "profession", "value": "Chauffeur", "type": "text" },
+                { "key": "nom_pere", "value": "X", "type": "text" },
+                { "key": "nom_mere", "value": "Y", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Cas d'erreur : numéro d'écrou déjà utilisé -> 422 avec message explicite."
+          }
+        }
+      ]
+    }
+  ]
+}
