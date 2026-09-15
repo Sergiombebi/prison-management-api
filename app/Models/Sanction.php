@@ -12,7 +12,7 @@ class Sanction extends Model
 
     protected $fillable = [
         'detenu_id',
-        'type_sanction',
+        'type_sanction_id',
         'motif',
         'date_faute',
         'date_debut',
@@ -41,6 +41,11 @@ class Sanction extends Model
     public function detenu(): BelongsTo
     {
         return $this->belongsTo(Detenu::class);
+    }
+
+    public function typeSanction(): BelongsTo
+    {
+        return $this->belongsTo(TypeSanction::class);
     }
 
     public function celluleDisciplinaire(): BelongsTo

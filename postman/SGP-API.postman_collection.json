@@ -13,7 +13,8 @@
     { "key": "mandas_id", "value": "", "type": "string" },
     { "key": "cellule_id", "value": "", "type": "string" },
     { "key": "cellule_disciplinaire_id", "value": "", "type": "string" },
-    { "key": "sanction_id", "value": "", "type": "string" }
+    { "key": "sanction_id", "value": "", "type": "string" },
+    { "key": "type_sanction_id", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -1001,6 +1002,81 @@
           }
         },
         {
+          "name": "Créer un type de sanction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('type_sanction_id', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"libelle\": \"Isolement\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/types-sanction",
+              "host": ["{{base_url}}"],
+              "path": ["types-sanction"]
+            },
+            "description": "Table de référence gérable sans redéploiement (au lieu d'un texte libre ou d'un enum figé dans le code). `libelle` doit être unique."
+          }
+        },
+        {
+          "name": "Lister les types de sanction",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/types-sanction",
+              "host": ["{{base_url}}"],
+              "path": ["types-sanction"]
+            },
+            "description": "Retourne tous les types (actifs et désactivés) - filtrez côté frontend sur `est_actif` pour n'afficher que les types utilisables dans un menu déroulant."
+          }
+        },
+        {
+          "name": "Désactiver un type de sanction",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"libelle\": \"Isolement\",\n    \"est_actif\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/types-sanction/{{type_sanction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["types-sanction", "{{type_sanction_id}}"]
+            },
+            "description": "Jamais de suppression : un type désactivé (est_actif=false) reste lisible sur les sanctions qui l'utilisent déjà, mais devient indisponible pour en créer de nouvelles."
+          }
+        },
+        {
           "name": "Créer une sanction (avec cellule disciplinaire)",
           "event": [
             {
@@ -1028,14 +1104,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type_sanction\": \"Isolement\",\n    \"motif\": \"Bagarre en cour de promenade\",\n    \"date_faute\": \"2026-09-14\",\n    \"date_debut\": \"2026-09-15\",\n    \"cellule_disciplinaire_id\": {{cellule_disciplinaire_id}}\n}"
+              "raw": "{\n    \"type_sanction_id\": {{type_sanction_id}},\n    \"motif\": \"Bagarre en cour de promenade\",\n    \"date_faute\": \"2026-09-14\",\n    \"date_debut\": \"2026-09-15\",\n    \"cellule_disciplinaire_id\": {{cellule_disciplinaire_id}}\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/sanctions",
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}", "sanctions"]
             },
-            "description": "type_sanction est un texte libre saisi par l'agent (pas de liste fermée). Si cellule_disciplinaire_id est fourni, le détenu est réellement déplacé (nouvelle affectation créée, ancienne clôturée) - l'occupation des cellules reste exacte. La cellule d'origine est mémorisée automatiquement (cellule_origine dans la réponse) pour le retour à la fin de la sanction."
+            "description": "type_sanction_id référence la table types-sanction (jouez d'abord 'Créer un type de sanction'). Doit pointer vers un type actif, sinon 422. Si cellule_disciplinaire_id est fourni, le détenu est réellement déplacé (nouvelle affectation créée, ancienne clôturée) - l'occupation des cellules reste exacte. La cellule d'origine est mémorisée automatiquement (cellule_origine dans la réponse) pour le retour à la fin de la sanction."
           }
         },
         {

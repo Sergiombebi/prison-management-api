@@ -8,13 +8,14 @@ use App\Http\Requests\UpdateSanctionRequest;
 use App\Http\Resources\SanctionResource;
 use App\Models\Detenu;
 use App\Models\Sanction;
+use App\Models\TypeSanction;
 use App\Services\CelluleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SanctionController extends Controller
 {
-    private const RELATIONS = ['celluleDisciplinaire', 'celluleOrigine', 'affectationDisciplinaire', 'createdBy', 'updatedBy'];
+    private const RELATIONS = ['typeSanction', 'celluleDisciplinaire', 'celluleOrigine', 'affectationDisciplinaire', 'createdBy', 'updatedBy'];
 
     public function __construct(
         private readonly CelluleAssignmentService $assignment,
@@ -44,11 +45,13 @@ class SanctionController extends Controller
             // l'occupation des cellules reste exacte (contrairement à l'ancienne app,
             // où la cellule n'était qu'une information sans effet réel).
             if (! empty($data['cellule_disciplinaire_id'])) {
+                $libelle = TypeSanction::find($data['type_sanction_id'])?->libelle ?? 'Sanction disciplinaire';
+
                 $affectation = $this->assignment->assigner(
                     detenu: $detenu,
                     celluleId: $data['cellule_disciplinaire_id'],
                     date: $data['date_debut'],
-                    motif: "Sanction disciplinaire : {$data['type_sanction']}",
+                    motif: "Sanction disciplinaire : {$libelle}",
                     userId: $request->user()->id,
                 );
                 $affectationDisciplinaireId = $affectation->id;
@@ -56,7 +59,7 @@ class SanctionController extends Controller
 
             return Sanction::create([
                 'detenu_id' => $detenu->id,
-                'type_sanction' => $data['type_sanction'],
+                'type_sanction_id' => $data['type_sanction_id'],
                 'motif' => $data['motif'],
                 'date_faute' => $data['date_faute'],
                 'date_debut' => $data['date_debut'],

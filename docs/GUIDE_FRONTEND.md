@@ -378,7 +378,16 @@ GET  /detenus/{id}/affectations   (historique complet)
 ```
 Clôture automatiquement l'affectation active précédente (`date_fin`) au lieu de la supprimer — vrai historique, jamais de perte de trace. Rejette (`422`) si la cellule est déjà pleine ; ce contrôle est fait **avec verrouillage côté serveur**, donc même deux affectations envoyées en même temps ne peuvent pas faire déborder une cellule.
 
-### 9.3 Sanctions
+### 9.3 Types de sanction
+
+```
+GET  /types-sanction
+POST /types-sanction
+PUT  /types-sanction/{id}
+```
+Le type de sanction n'est **plus du texte libre** : c'est une petite table de référence, modifiable sans redéploiement (contrairement à un enum figé dans le code). `GET /types-sanction` retourne tous les types (actifs et désactivés) — filtrez sur `est_actif` côté frontend pour n'afficher que les types utilisables dans un menu déroulant de création. `PUT` désactive un type (`est_actif=false`) au lieu de le supprimer, pour ne pas casser l'historique des sanctions qui l'utilisent déjà.
+
+### 9.4 Sanctions
 
 ```
 POST   /detenus/{id}/sanctions
@@ -387,7 +396,7 @@ PUT    /sanctions/{id}
 DELETE /sanctions/{id}
 POST   /sanctions/{id}/terminer
 ```
-`type_sanction` est un **champ texte libre**, rempli par l'agent (pas de liste fermée). `statut` (`"À venir"`/`"En cours"`/`"Terminée"`) est **calculé à la lecture** à partir des dates — jamais stocké.
+`type_sanction_id` référence un type actif de `/types-sanction` (un type désactivé est refusé, `422`). `statut` (`"À venir"`/`"En cours"`/`"Terminée"`) est **calculé à la lecture** à partir des dates — jamais stocké.
 
 **Point important** : si `cellule_disciplinaire_id` est fourni à la création, le détenu est **réellement déplacé** dans cette cellule (nouvelle affectation créée, ancienne clôturée) — l'occupation des cellules reste toujours exacte. La cellule d'où il venait est mémorisée automatiquement (`cellule_origine` dans la réponse).
 
@@ -443,3 +452,6 @@ Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n
 | `PUT` | `/sanctions/{id}` | Oui | Modifier une sanction |
 | `DELETE` | `/sanctions/{id}` | Oui | Désactiver une sanction (soft) |
 | `POST` | `/sanctions/{id}/terminer` | Oui | Terminer une sanction (libère la cellule disciplinaire) |
+| `GET` | `/types-sanction` | Oui | Lister les types de sanction |
+| `POST` | `/types-sanction` | Oui | Créer un type de sanction |
+| `PUT` | `/types-sanction/{id}` | Oui | Modifier/désactiver un type de sanction |

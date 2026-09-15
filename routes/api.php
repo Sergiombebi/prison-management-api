@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
 use App\Http\Controllers\Api\V1\MandasController;
 use App\Http\Controllers\Api\V1\SanctionController;
+use App\Http\Controllers\Api\V1\TypeSanctionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -43,5 +44,9 @@ Route::prefix('v1')->group(function () {
         Route::put('/sanctions/{sanction}', [SanctionController::class, 'update']);
         Route::delete('/sanctions/{sanction}', [SanctionController::class, 'destroy']);
         Route::post('/sanctions/{sanction}/terminer', [SanctionController::class, 'terminer']);
+
+        Route::get('/types-sanction', [TypeSanctionController::class, 'index']);
+        Route::post('/types-sanction', [TypeSanctionController::class, 'store']);
+        Route::put('/types-sanction/{typeSanction}', [TypeSanctionController::class, 'update']);
     });
 });

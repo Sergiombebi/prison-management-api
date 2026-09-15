@@ -15,7 +15,10 @@ class SanctionResource extends JsonResource
         return [
             'id' => $this->id,
             'detenu_id' => $this->detenu_id,
-            'type_sanction' => $this->type_sanction,
+            'type_sanction' => $this->when($this->relationLoaded('typeSanction'), fn () => [
+                'id' => $this->typeSanction->id,
+                'libelle' => $this->typeSanction->libelle,
+            ]),
             'motif' => $this->motif,
             'date_faute' => $this->date_faute?->toDateString(),
             'date_debut' => $this->date_debut?->toDateString(),
