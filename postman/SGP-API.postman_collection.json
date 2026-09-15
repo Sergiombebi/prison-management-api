@@ -408,6 +408,113 @@
             },
             "description": "Ne supprime jamais la ligne en base : passe est_present à false (le détenu n'est plus physiquement présent, quelle que soit la raison), et cascade la même désactivation (est_actif=false) sur tous ses mandats."
           }
+        },
+        {
+          "name": "Restaurer un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('est_present repasse à true', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.est_present).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/restore",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "restore"]
+            },
+            "description": "Réactive un détenu désactivé (est_present=true) et cascade la réactivation sur tous ses mandats (est_actif=true). À utiliser après 'Supprimer (désactiver)', ou suite au conflit 409 renvoyé par 'Créer un détenu' quand un CNI/passeport correspond à un détenu désactivé (réincarcération)."
+          }
+        },
+        {
+          "name": "Modifier un détenu désactivé (bloqué → 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 409', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-000123\",\n    \"nom\": \"Tentative interdite\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1990-05-14\",\n    \"lieu_naissance\": \"Yaoundé\",\n    \"profession\": \"Menuisier\",\n    \"nom_pere\": \"X\",\n    \"nom_mere\": \"Y\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "mandas"]
+            },
+            "description": "Cas d'erreur : jouez d'abord 'Supprimer (désactiver) un détenu', puis cette requête -> 409. Un détenu désactivé ne peut plus être modifié tant qu'il n'est pas restauré (voir 'Restaurer un détenu')."
+          }
+        },
+        {
+          "name": "Créer un détenu (CNI déjà lié à un détenu désactivé → 409 + suggestion de restauration)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 409', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test(\"La reponse contient un lien de restauration\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.conflict).to.have.property('restore_url');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-000999\",\n    \"nom\": \"Meme Personne Nouvel Ecrou\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1990-05-14\",\n    \"lieu_naissance\": \"Yaoundé\",\n    \"profession\": \"Menuisier\",\n    \"nom_pere\": \"X\",\n    \"nom_mere\": \"Y\",\n    \"numero_cni\": \"100200300\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Cas de réincarcération : jouez d'abord 'Créer un détenu' (avec numero_cni=100200300) puis 'Supprimer (désactiver)', puis cette requête avec le même numero_cni mais un numero_ecrou différent -> 409, avec `conflict.detenu_id` et `conflict.restore_url` pointant vers le dossier désactivé à restaurer plutôt que de créer un doublon."
+          }
         }
       ]
     },
