@@ -348,7 +348,60 @@ DELETE /mandas/{id}
 
 ---
 
-## 9. Récapitulatif des codes d'erreur
+## 9. Discipline : cellules, affectations, sanctions
+
+### 9.1 Cellules
+
+```
+GET    /cellules?page=1        (paginé, 10/page)
+POST   /cellules
+GET    /cellules/{id}
+PUT    /cellules/{id}
+```
+Réponse d'une cellule :
+```json
+{
+  "id": 1, "numero": "C1", "bloc": "A", "type_cellule": "Normale",
+  "capacite_max": 3, "effectif_actuel": 2, "places_disponibles": 1
+}
+```
+`effectif_actuel`/`places_disponibles` sont **toujours calculés à la volée**, jamais stockés — donc jamais de dérive possible. `PUT` rejette (`422`) toute réduction de capacité en dessous de l'effectif déjà présent.
+
+### 9.2 Affecter un détenu à une cellule
+
+```
+POST /detenus/{id}/affectations
+GET  /detenus/{id}/affectations   (historique complet)
+```
+```json
+{ "cellule_id": 3, "motif_affectation": "Arrivée à l'établissement" }
+```
+Clôture automatiquement l'affectation active précédente (`date_fin`) au lieu de la supprimer — vrai historique, jamais de perte de trace. Rejette (`422`) si la cellule est déjà pleine ; ce contrôle est fait **avec verrouillage côté serveur**, donc même deux affectations envoyées en même temps ne peuvent pas faire déborder une cellule.
+
+### 9.3 Sanctions
+
+```
+POST   /detenus/{id}/sanctions
+GET    /sanctions/{id}
+PUT    /sanctions/{id}
+DELETE /sanctions/{id}
+POST   /sanctions/{id}/terminer
+```
+`type_sanction` est un **champ texte libre**, rempli par l'agent (pas de liste fermée). `statut` (`"À venir"`/`"En cours"`/`"Terminée"`) est **calculé à la lecture** à partir des dates — jamais stocké.
+
+**Point important** : si `cellule_disciplinaire_id` est fourni à la création, le détenu est **réellement déplacé** dans cette cellule (nouvelle affectation créée, ancienne clôturée) — l'occupation des cellules reste toujours exacte. La cellule d'où il venait est mémorisée automatiquement (`cellule_origine` dans la réponse).
+
+Pour **terminer** une sanction en cellule disciplinaire :
+```
+POST /sanctions/{id}/terminer
+```
+Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n'a alors plus de cellule assignée** — rien n'est automatique, c'est volontaire : le frontend doit ensuite appeler `POST /detenus/{id}/affectations` pour le remettre quelque part (la réponse de `terminer` rappelle la cellule d'origine suggérée). Ça évite qu'un retour automatique échoue silencieusement si la cellule d'origine est entre-temps devenue pleine.
+
+`DELETE /sanctions/{id}` désactive juste la fiche (`est_actif=false`, ex: saisie par erreur) — ça ne touche jamais à la cellule disciplinaire ; utilisez `terminer` pour ça.
+
+---
+
+## 10. Récapitulatif des codes d'erreur
 
 | Code | Signification | Action frontend |
 |---|---|---|
@@ -361,7 +414,7 @@ DELETE /mandas/{id}
 
 ---
 
-## 10. Récapitulatif de tous les endpoints
+## 11. Récapitulatif de tous les endpoints
 
 | Méthode | Route | Protégé | Description |
 |---|---|---|---|
@@ -370,7 +423,7 @@ DELETE /mandas/{id}
 | `POST` | `/auth/logout` | Oui | Déconnexion |
 | `POST` | `/detenus/photos` | Oui | Upload d'1 ou 2 photos (multipart) |
 | `POST` | `/detenus` | Oui | Créer un détenu (JSON) |
-| `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs |
+| `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`) |
 | `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats) |
 | `PUT` | `/detenus/{id}` | Oui | Modifier (JSON) |
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
@@ -379,3 +432,14 @@ DELETE /mandas/{id}
 | `GET` | `/mandas/{id}` | Oui | Détail d'un mandat (+ identité du détenu) |
 | `PUT` | `/mandas/{id}` | Oui | Faire évoluer un mandat (reclasse le détenu automatiquement) |
 | `DELETE` | `/mandas/{id}` | Oui | Désactiver un mandat (soft) |
+| `GET` | `/cellules?page=N` | Oui | Liste paginée des cellules |
+| `POST` | `/cellules` | Oui | Créer une cellule |
+| `GET` | `/cellules/{id}` | Oui | Détail d'une cellule |
+| `PUT` | `/cellules/{id}` | Oui | Modifier une cellule |
+| `POST` | `/detenus/{id}/affectations` | Oui | Affecter le détenu à une cellule |
+| `GET` | `/detenus/{id}/affectations` | Oui | Historique des affectations du détenu |
+| `POST` | `/detenus/{id}/sanctions` | Oui | Créer une sanction |
+| `GET` | `/sanctions/{id}` | Oui | Détail d'une sanction |
+| `PUT` | `/sanctions/{id}` | Oui | Modifier une sanction |
+| `DELETE` | `/sanctions/{id}` | Oui | Désactiver une sanction (soft) |
+| `POST` | `/sanctions/{id}/terminer` | Oui | Terminer une sanction (libère la cellule disciplinaire) |

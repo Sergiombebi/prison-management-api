@@ -82,6 +82,21 @@ class Detenu extends Model
         return $this->hasOne(Mandas::class)->latestOfMany('date_incarceration');
     }
 
+    public function affectations(): HasMany
+    {
+        return $this->hasMany(AffectationCellule::class);
+    }
+
+    public function affectationActive(): HasOne
+    {
+        return $this->hasOne(AffectationCellule::class)->whereNull('date_fin');
+    }
+
+    public function sanctions(): HasMany
+    {
+        return $this->hasMany(Sanction::class);
+    }
+
     public function getAgeAttribute(): ?int
     {
         return $this->date_naissance?->age;

@@ -141,6 +141,12 @@ class DetenuController extends Controller
                 'est_actif' => false,
                 'updated_by' => $request->user()->id,
             ]);
+
+            // Le détenu n'occupe plus physiquement de cellule.
+            $detenu->affectations()->whereNull('date_fin')->update([
+                'date_fin' => now(),
+                'updated_by' => $request->user()->id,
+            ]);
         });
 
         return response()->json([

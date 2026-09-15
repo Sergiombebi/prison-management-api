@@ -10,7 +10,10 @@
     { "key": "detenu_id", "value": "", "type": "string" },
     { "key": "photo_face_url", "value": "", "type": "string" },
     { "key": "photo_face_public_id", "value": "", "type": "string" },
-    { "key": "mandas_id", "value": "", "type": "string" }
+    { "key": "mandas_id", "value": "", "type": "string" },
+    { "key": "cellule_id", "value": "", "type": "string" },
+    { "key": "cellule_disciplinaire_id", "value": "", "type": "string" },
+    { "key": "sanction_id", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -826,6 +829,274 @@
               "path": ["mandas", "{{mandas_id}}"]
             },
             "description": "Ne supprime jamais la ligne : passe est_actif à false (ex: mandat saisi par erreur), sans toucher au détenu lui-même."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Discipline (cellules, affectations, sanctions)",
+      "item": [
+        {
+          "name": "Créer une cellule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('cellule_id', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero\": \"C1\",\n    \"bloc\": \"A\",\n    \"capacite_max\": 2,\n    \"type_cellule\": \"Normale\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cellules",
+              "host": ["{{base_url}}"],
+              "path": ["cellules"]
+            },
+            "description": "`numero` unique par bloc. `effectif_actuel`/`places_disponibles` dans la réponse sont toujours calculés à la volée depuis les affectations actives - jamais stockés, donc jamais de dérive possible (contrairement à l'ancienne app)."
+          }
+        },
+        {
+          "name": "Créer une cellule disciplinaire",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('cellule_disciplinaire_id', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero\": \"ISO1\",\n    \"bloc\": \"ISOLEMENT\",\n    \"capacite_max\": 1,\n    \"type_cellule\": \"Disciplinaire\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cellules",
+              "host": ["{{base_url}}"],
+              "path": ["cellules"]
+            },
+            "description": "Une cellule normale ne se distingue de sa version disciplinaire que par convention (type_cellule/numérotation) - c'est vous qui décidez laquelle utiliser comme destination d'une sanction."
+          }
+        },
+        {
+          "name": "Lister les cellules (paginé)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cellules?page=1",
+              "host": ["{{base_url}}"],
+              "path": ["cellules"],
+              "query": [{ "key": "page", "value": "1" }]
+            },
+            "description": "10 par page, triées par bloc puis numéro."
+          }
+        },
+        {
+          "name": "Modifier une cellule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero\": \"C1\",\n    \"bloc\": \"A\",\n    \"capacite_max\": 3,\n    \"type_cellule\": \"Normale\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cellules/{{cellule_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["cellules", "{{cellule_id}}"]
+            },
+            "description": "Rejette (422) toute réduction de capacité en dessous de l'effectif actuellement présent dans la cellule."
+          }
+        },
+        {
+          "name": "Affecter un détenu à une cellule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cellule_id\": {{cellule_id}},\n    \"motif_affectation\": \"Arrivée à l'établissement\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/affectations",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "affectations"]
+            },
+            "description": "Clôture automatiquement (date_fin) l'affectation active précédente du détenu au lieu de la supprimer - vraie traçabilité. Rejette (422) si la cellule est déjà à sa capacité max, avec verrouillage anti-concurrence : deux affectations simultanées ne peuvent plus faire déborder une cellule."
+          }
+        },
+        {
+          "name": "Historique des affectations d'un détenu",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/affectations",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "affectations"]
+            },
+            "description": "Historique complet, y compris les affectations clôturées (est_active=false, avec leur date_fin)."
+          }
+        },
+        {
+          "name": "Créer une sanction (avec cellule disciplinaire)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('sanction_id', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type_sanction\": \"Isolement\",\n    \"motif\": \"Bagarre en cour de promenade\",\n    \"date_faute\": \"2026-09-14\",\n    \"date_debut\": \"2026-09-15\",\n    \"cellule_disciplinaire_id\": {{cellule_disciplinaire_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/sanctions",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "sanctions"]
+            },
+            "description": "type_sanction est un texte libre saisi par l'agent (pas de liste fermée). Si cellule_disciplinaire_id est fourni, le détenu est réellement déplacé (nouvelle affectation créée, ancienne clôturée) - l'occupation des cellules reste exacte. La cellule d'origine est mémorisée automatiquement (cellule_origine dans la réponse) pour le retour à la fin de la sanction."
+          }
+        },
+        {
+          "name": "Détails d'une sanction",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sanctions/{{sanction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sanctions", "{{sanction_id}}"]
+            },
+            "description": "`statut` (À venir / En cours / Terminée) est calculé à la lecture à partir des dates - jamais stocké ni réécrit en base, contrairement à l'ancienne app qui modifiait silencieusement la BD à chaque simple consultation."
+          }
+        },
+        {
+          "name": "Terminer une sanction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sanctions/{{sanction_id}}/terminer",
+              "host": ["{{base_url}}"],
+              "path": ["sanctions", "{{sanction_id}}", "terminer"]
+            },
+            "description": "Libère la cellule disciplinaire (clôture l'affectation) et marque la sanction terminée. Le détenu n'a alors plus de cellule active - le message de réponse rappelle la cellule d'origine à utiliser pour le réaffecter via POST /detenus/{id}/affectations. Rien n'est automatique : c'est un agent qui déclenche le retour, comme convenu."
+          }
+        },
+        {
+          "name": "Désactiver une sanction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sanctions/{{sanction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sanctions", "{{sanction_id}}"]
+            },
+            "description": "Pour une sanction saisie par erreur - passe est_actif à false sans toucher à la cellule disciplinaire (utilisez 'Terminer' pour ça)."
           }
         }
       ]

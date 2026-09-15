@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AffectationController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CelluleController;
 use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
 use App\Http\Controllers\Api\V1\MandasController;
+use App\Http\Controllers\Api\V1\SanctionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -26,5 +29,19 @@ Route::prefix('v1')->group(function () {
         Route::get('/mandas/{mandas}', [MandasController::class, 'show']);
         Route::put('/mandas/{mandas}', [MandasController::class, 'update']);
         Route::delete('/mandas/{mandas}', [MandasController::class, 'destroy']);
+
+        Route::get('/cellules', [CelluleController::class, 'index']);
+        Route::post('/cellules', [CelluleController::class, 'store']);
+        Route::get('/cellules/{cellule}', [CelluleController::class, 'show']);
+        Route::put('/cellules/{cellule}', [CelluleController::class, 'update']);
+
+        Route::get('/detenus/{detenu}/affectations', [AffectationController::class, 'index']);
+        Route::post('/detenus/{detenu}/affectations', [AffectationController::class, 'store']);
+
+        Route::post('/detenus/{detenu}/sanctions', [SanctionController::class, 'store']);
+        Route::get('/sanctions/{sanction}', [SanctionController::class, 'show']);
+        Route::put('/sanctions/{sanction}', [SanctionController::class, 'update']);
+        Route::delete('/sanctions/{sanction}', [SanctionController::class, 'destroy']);
+        Route::post('/sanctions/{sanction}/terminer', [SanctionController::class, 'terminer']);
     });
 });
