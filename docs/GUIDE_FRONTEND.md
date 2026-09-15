@@ -174,6 +174,27 @@ Utilisez `meta.last_page`/`meta.total` pour construire les contrôles de paginat
 
 C'est une **vue résumée** (colonnes de l'ancienne liste C#) — pour tous les détails d'un détenu, voir section 4.
 
+### 3.1 Filtrer par catégorie pénale (Prévenus / Condamnés / Appellants / Cassationnaires / DPAC)
+
+Reprend les 5 onglets de l'ancienne application, sous forme d'un simple filtre sur ce même listing — pas 5 endpoints séparés :
+
+```
+GET /detenus?categorie_penale=prevenus
+```
+Valeurs acceptées : `prevenus`, `condamnes`, `appellants`, `cassationnaires`, `dpac`. Une valeur invalide → `422`.
+
+Le classement est recalculé à chaque appel à partir des mandats **actifs** de chaque détenu (mandat sans date d'expiration, ou dont la date d'expiration est encore dans le futur) :
+
+| `categorie_penale` | Règle |
+|---|---|
+| `prevenus` | Tous les mandats actifs du détenu sont "Détention provisoire" |
+| `condamnes` | Exactement un mandat actif, et c'est une "Exécution de peine" |
+| `appellants` | Au moins un mandat actif "Appellant", et aucun "Exécution de peine" actif en parallèle |
+| `cassationnaires` | Au moins un mandat actif "Cassationnaire", et aucun "Exécution de peine" actif en parallèle |
+| `dpac` | Au moins 2 mandats actifs simultanés, dont au moins une "Exécution de peine" |
+
+Un détenu peut changer de catégorie automatiquement en ajoutant un nouveau mandat (section 8) — ce n'est jamais assigné manuellement.
+
 ---
 
 ## 4. Consulter le détail d'un détenu

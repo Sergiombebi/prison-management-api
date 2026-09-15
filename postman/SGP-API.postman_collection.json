@@ -315,6 +315,36 @@
           }
         },
         {
+          "name": "Lister les détenus par catégorie pénale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus?categorie_penale=prevenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"],
+              "query": [{ "key": "categorie_penale", "value": "prevenus" }]
+            },
+            "description": "Reprend les 5 onglets de l'ancienne app (Prévenus/Condamnés/Appellants/Cassationnaires/DPAC) comme un seul filtre sur le listing paginé, au lieu de 5 endpoints séparés. Valeurs acceptées pour `categorie_penale` : prevenus, condamnes, appellants, cassationnaires, dpac.\n\nRègles de classement (basées sur les mandats *actifs* du détenu, c'est-à-dire sans date d'expiration ou avec une date future) :\n- prevenus : tous les mandats actifs sont 'Détention provisoire'\n- condamnes : exactement un mandat actif, et c'est une 'Exécution de peine'\n- appellants : au moins un mandat actif 'Appellant' ET aucun 'Exécution de peine' actif en parallèle\n- cassationnaires : au moins un mandat actif 'Cassationnaire' ET aucun 'Exécution de peine' actif en parallèle\n- dpac : au moins 2 mandats actifs simultanés, dont au moins une 'Exécution de peine'\n\nUne valeur invalide -> 422."
+          }
+        },
+        {
           "name": "Détails d'un détenu",
           "event": [
             {

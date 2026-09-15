@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\CategoriePenale;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDetenuRequest;
 use App\Http\Requests\UpdateDetenuRequest;
@@ -26,13 +27,40 @@ class DetenuController extends Controller
 
     public function index(Request $request)
     {
-        $detenus = Detenu::query()
+        $query = Detenu::query()
             ->where('est_present', true)
-            ->with('latestMandas')
-            ->latest('id')
-            ->paginate(self::PER_PAGE);
+            ->with('latestMandas');
+
+        if ($request->filled('categorie_penale')) {
+            $query = $this->applyCategoriePenale($query, $request->query('categorie_penale'));
+        }
+
+        $detenus = $query->latest('id')->paginate(self::PER_PAGE);
 
         return DetenuListResource::collection($detenus);
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder<Detenu> $query
+     * @return \Illuminate\Database\Eloquent\Builder<Detenu>
+     */
+    private function applyCategoriePenale($query, string $categorie)
+    {
+        $valeurs = array_column(CategoriePenale::cases(), 'value');
+
+        if (! in_array($categorie, $valeurs, true)) {
+            throw ValidationException::withMessages([
+                'categorie_penale' => ['Catégorie invalide. Valeurs acceptées : '.implode(', ', $valeurs).'.'],
+            ]);
+        }
+
+        return match (CategoriePenale::from($categorie)) {
+            CategoriePenale::Prevenus => $query->prevenus(),
+            CategoriePenale::Condamnes => $query->condamnes(),
+            CategoriePenale::Appellants => $query->appellants(),
+            CategoriePenale::Cassationnaires => $query->cassationnaires(),
+            CategoriePenale::Dpac => $query->dpac(),
+        };
     }
 
     public function show(Detenu $detenu)
