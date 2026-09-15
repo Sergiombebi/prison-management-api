@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/detenus/{detenu}', [DetenuController::class, 'show']);
         Route::put('/detenus/{detenu}', [DetenuController::class, 'update']);
         Route::delete('/detenus/{detenu}', [DetenuController::class, 'destroy']);
+        Route::post('/detenus/{detenu}/restore', [DetenuController::class, 'restore']);
 
         Route::post('/detenus/{detenu}/mandas', [MandasController::class, 'store']);
     });

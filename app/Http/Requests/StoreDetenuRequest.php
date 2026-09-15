@@ -34,8 +34,11 @@ class StoreDetenuRequest extends FormRequest
             'statut_matrimonial' => ['nullable', 'string', 'max:255'],
             'nombre_enfants' => ['nullable', 'integer', 'min:0', 'max:255'],
             'niveau_etudes' => ['nullable', 'string', 'max:255'],
-            'numero_cni' => ['nullable', 'string', 'max:255', 'unique:detenus,numero_cni'],
-            'numero_passeport' => ['nullable', 'string', 'max:255', 'unique:detenus,numero_passeport'],
+            // Pas de règle "unique" ici : un doublon peut correspondre à un détenu
+            // désactivé (réincarcération) - géré à la main dans le contrôleur pour
+            // pouvoir proposer une restauration plutôt qu'un simple rejet.
+            'numero_cni' => ['nullable', 'string', 'max:255'],
+            'numero_passeport' => ['nullable', 'string', 'max:255'],
             'nom_pere' => ['required', 'string', 'max:255'],
             'nom_mere' => ['required', 'string', 'max:255'],
 
@@ -61,8 +64,6 @@ class StoreDetenuRequest extends FormRequest
         return [
             'numero_ecrou.required' => "Le numéro d'écrou est obligatoire.",
             'numero_ecrou.unique' => "Ce numéro d'écrou est déjà utilisé par un autre détenu.",
-            'numero_cni.unique' => "Ce numéro de CNI est déjà associé à un autre détenu (possible réincarcération).",
-            'numero_passeport.unique' => "Ce numéro de passeport est déjà associé à un autre détenu (possible réincarcération).",
             'date_naissance.before' => 'La date de naissance doit être antérieure à aujourd\'hui.',
             'photo_face_url.required_with' => "Le public_id doit être accompagné de l'URL de la photo de face.",
             'photo_face_public_id.required_with' => "L'URL de la photo de face doit être accompagnée de son public_id (retournés ensemble par /detenus/photos).",
