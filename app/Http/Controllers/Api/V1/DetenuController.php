@@ -24,6 +24,7 @@ class DetenuController extends Controller
     public function index(Request $request)
     {
         $detenus = Detenu::query()
+            ->with('latestMandas')
             ->latest('id')
             ->paginate(self::PER_PAGE);
 
@@ -32,7 +33,7 @@ class DetenuController extends Controller
 
     public function show(Detenu $detenu)
     {
-        return new DetenuResource($detenu->load(['createdBy', 'updatedBy']));
+        return new DetenuResource($detenu->load(['createdBy', 'updatedBy', 'mandas']));
     }
 
     public function store(StoreDetenuRequest $request)
@@ -88,7 +89,7 @@ class DetenuController extends Controller
 
         DB::transaction(fn () => $detenu->update($data));
 
-        return new DetenuResource($detenu->fresh(['createdBy', 'updatedBy']));
+        return new DetenuResource($detenu->fresh(['createdBy', 'updatedBy', 'mandas']));
     }
 
     public function destroy(Request $request, Detenu $detenu)

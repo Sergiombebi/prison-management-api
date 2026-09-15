@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Detenu extends Model
 {
@@ -72,6 +73,11 @@ class Detenu extends Model
     public function mandas(): HasMany
     {
         return $this->hasMany(Mandas::class);
+    }
+
+    public function latestMandas(): HasOne
+    {
+        return $this->hasOne(Mandas::class)->latestOfMany('date_incarceration');
     }
 
     public function getAgeAttribute(): ?int
