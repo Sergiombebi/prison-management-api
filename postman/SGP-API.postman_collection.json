@@ -162,7 +162,7 @@
       "name": "Détenus",
       "item": [
         {
-          "name": "Uploader une photo",
+          "name": "Uploader une ou deux photos",
           "event": [
             {
               "listen": "test",
@@ -175,8 +175,10 @@
                   "",
                   "if (pm.response.code === 201) {",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set('photo_face_url', body.data.url);",
-                  "    pm.collectionVariables.set('photo_face_public_id', body.data.public_id);",
+                  "    if (body.data.photo_face) {",
+                  "        pm.collectionVariables.set('photo_face_url', body.data.photo_face.url);",
+                  "        pm.collectionVariables.set('photo_face_public_id', body.data.photo_face.public_id);",
+                  "    }",
                   "}"
                 ]
               }
@@ -191,8 +193,8 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "photo", "type": "file", "src": [], "description": "Le fichier image (jpg/png), max 5 Mo" },
-                { "key": "type", "value": "face", "type": "text", "description": "'face' ou 'profil'" }
+                { "key": "photo_face", "type": "file", "src": [], "description": "Optionnel. jpg/jpeg/png/gif/bmp/webp/heic/heif, max 8 Mo" },
+                { "key": "photo_profil", "type": "file", "src": [], "description": "Optionnel. Au moins une des deux (photo_face ou photo_profil) est requise" }
               ]
             },
             "url": {
@@ -200,7 +202,7 @@
               "host": ["{{base_url}}"],
               "path": ["detenus", "photos"]
             },
-            "description": "Seul endpoint en multipart/form-data de toute la collection — c'est le seul endroit où un vrai fichier binaire transite, ce que JSON ne peut pas transporter nativement. Upload la photo sur Cloudinary et retourne son URL + public_id, à réutiliser tels quels (comme simples chaînes) dans les endpoints de création/modification de détenu, qui restent en JSON pur. Stocke automatiquement l'URL et le public_id dans les variables de collection."
+            "description": "Seul endpoint en multipart/form-data de toute la collection — c'est le seul endroit où un vrai fichier binaire transite, ce que JSON ne peut pas transporter nativement. Accepte les deux photos en un seul appel (chacune optionnelle, mais au moins une requise). Upload sur Cloudinary et retourne `data.photo_face`/`data.photo_profil` ({url, public_id}), à réutiliser tels quels (comme simples chaînes) dans les endpoints de création/modification de détenu, qui restent en JSON pur. Si Cloudinary est indisponible -> 502 avec message explicite plutôt qu'une erreur brute."
           }
         },
         {
