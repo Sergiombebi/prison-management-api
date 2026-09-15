@@ -47,6 +47,12 @@ class MandasResource extends JsonResource
 
             'est_actif' => $this->est_actif,
 
+            'detenu' => $this->when($this->relationLoaded('detenu'), fn () => [
+                'id' => $this->detenu->id,
+                'numero_ecrou' => $this->detenu->numero_ecrou,
+                'nom' => $this->detenu->nom,
+            ]),
+
             'created_by' => new UserResource($this->whenLoaded('createdBy')),
             'updated_by' => new UserResource($this->whenLoaded('updatedBy')),
             'created_at' => $this->created_at,

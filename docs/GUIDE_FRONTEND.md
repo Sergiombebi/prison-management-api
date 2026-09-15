@@ -332,6 +332,20 @@ Champ manquant pour le statut choisi → `422` avec le détail par champ.
 
 Détenu désactivé → `409` (même logique que la modification, section 5) : il faut le restaurer avant de pouvoir lui ajouter un mandat.
 
+### 8.1 Consulter, modifier ou désactiver un mandat précis
+
+```
+GET    /mandas/{id}
+PUT    /mandas/{id}
+DELETE /mandas/{id}
+```
+
+`GET` retourne le mandat avec l'identité du détenu associé (`data.detenu`).
+
+`PUT` **fait évoluer un mandat existant** plutôt que d'en créer un nouveau — c'est le vrai usage courant : un mandat "Détention provisoire" reçoit un jugement et devient "Exécution de peine" ; un "Exécution de peine" fait l'objet d'un appel et devient "Appellant", etc. Mêmes règles de champs obligatoires que la création (section 8), selon `type_statut_penal`. Modifier un mandat **reclasse automatiquement** le détenu dans `/detenus?categorie_penale=...` (section 3.1) — rien à faire côté frontend pour ça, c'est recalculé à la volée. Bloqué (`409`) si le détenu associé est désactivé.
+
+`DELETE` désactive le mandat (`est_actif=false`) sans jamais le supprimer, et sans toucher au détenu — utile pour corriger un mandat saisi par erreur.
+
 ---
 
 ## 9. Récapitulatif des codes d'erreur
@@ -362,3 +376,6 @@ Détenu désactivé → `409` (même logique que la modification, section 5) : i
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
 | `POST` | `/detenus/{id}/restore` | Oui | Restaurer (+ ses mandats) |
 | `POST` | `/detenus/{id}/mandas` | Oui | Ajouter un mandat au détenu |
+| `GET` | `/mandas/{id}` | Oui | Détail d'un mandat (+ identité du détenu) |
+| `PUT` | `/mandas/{id}` | Oui | Faire évoluer un mandat (reclasse le détenu automatiquement) |
+| `DELETE` | `/mandas/{id}` | Oui | Désactiver un mandat (soft) |

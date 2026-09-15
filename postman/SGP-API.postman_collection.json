@@ -9,7 +9,8 @@
     { "key": "token", "value": "", "type": "string" },
     { "key": "detenu_id", "value": "", "type": "string" },
     { "key": "photo_face_url", "value": "", "type": "string" },
-    { "key": "photo_face_public_id", "value": "", "type": "string" }
+    { "key": "photo_face_public_id", "value": "", "type": "string" },
+    { "key": "mandas_id", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -599,7 +600,12 @@
                 "exec": [
                   "pm.test('Status code is 201', function () {",
                   "    pm.response.to.have.status(201);",
-                  "});"
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('mandas_id', body.data.id);",
+                  "}"
                 ]
               }
             }
@@ -613,7 +619,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-001\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"objets_personnels\": \"Montre, téléphone\",\n    \"autorite_penitentiaire\": \"Régisseur\",\n    \"etat_physique_arrivee\": \"Bon état\"\n}"
+              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-001\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\",\n    \"objets_personnels\": \"Montre, téléphone\",\n    \"autorite_penitentiaire\": \"Régisseur\",\n    \"etat_physique_arrivee\": \"Bon état\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -647,7 +653,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type_statut_penal\": \"Exécution de peine\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-002\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\"\n}"
+              "raw": "{\n    \"type_statut_penal\": \"Exécution de peine\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-002\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -681,7 +687,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type_statut_penal\": \"Appellant\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-003\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-001\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_appel\": \"2026-03-01\",\n    \"tribunal_appel\": \"Cour d'Appel de Douala\",\n    \"decision_appel\": \"Peine confirmée\"\n}"
+              "raw": "{\n    \"type_statut_penal\": \"Appellant\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-003\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-001\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_appel\": \"2026-03-01\",\n    \"tribunal_appel\": \"Cour d'Appel de Douala\",\n    \"decision_appel\": \"Peine confirmée\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -715,7 +721,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"type_statut_penal\": \"Cassationnaire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-004\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-002\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_cassation\": \"2026-04-01\",\n    \"tribunal_cassation\": \"Cour Suprême\",\n    \"decision_cassation\": \"Pourvoi rejeté\"\n}"
+              "raw": "{\n    \"type_statut_penal\": \"Cassationnaire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-004\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-002\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_cassation\": \"2026-04-01\",\n    \"tribunal_cassation\": \"Cour Suprême\",\n    \"decision_cassation\": \"Pourvoi rejeté\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -723,6 +729,103 @@
               "path": ["detenus", "{{detenu_id}}", "mandas"]
             },
             "description": "'Cassationnaire' exige les champs jugement ET les champs cassation (date_cassation, tribunal_cassation, decision_cassation)."
+          }
+        },
+        {
+          "name": "Détails d'un mandat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mandas/{{mandas_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["mandas", "{{mandas_id}}"]
+            },
+            "description": "Consulte un mandat isolément, avec l'identité du détenu associé (`data.detenu`). Utilise automatiquement l'id du dernier mandat créé dans cette collection."
+          }
+        },
+        {
+          "name": "Modifier un mandat (faire évoluer le statut pénal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Exécution de peine\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-001\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-001\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"3 ans d'emprisonnement\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/mandas/{{mandas_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["mandas", "{{mandas_id}}"]
+            },
+            "description": "Fait évoluer un mandat existant plutôt que d'en recréer un nouveau — ex: ajouter le jugement à un mandat 'Détention provisoire' pour le faire passer à 'Exécution de peine'. Reclasse automatiquement le détenu dans /detenus?categorie_penale=... Rejette avec 409 si le détenu associé est désactivé (le restaurer d'abord)."
+          }
+        },
+        {
+          "name": "Désactiver un mandat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('est_actif passe à false', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.est_actif).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mandas/{{mandas_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["mandas", "{{mandas_id}}"]
+            },
+            "description": "Ne supprime jamais la ligne : passe est_actif à false (ex: mandat saisi par erreur), sans toucher au détenu lui-même."
           }
         }
       ]

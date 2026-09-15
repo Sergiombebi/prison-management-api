@@ -23,5 +23,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/detenus/{detenu}/restore', [DetenuController::class, 'restore']);
 
         Route::post('/detenus/{detenu}/mandas', [MandasController::class, 'store']);
+        Route::get('/mandas/{mandas}', [MandasController::class, 'show']);
+        Route::put('/mandas/{mandas}', [MandasController::class, 'update']);
+        Route::delete('/mandas/{mandas}', [MandasController::class, 'destroy']);
     });
 });
