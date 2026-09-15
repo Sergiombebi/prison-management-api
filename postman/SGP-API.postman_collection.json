@@ -315,6 +315,42 @@
           }
         },
         {
+          "name": "Rechercher un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('10 par page maximum', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.length).to.be.at.most(10);",
+                  "    pm.expect(body.meta.per_page).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus?search=Mballa",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"],
+              "query": [{ "key": "search", "value": "Mballa" }]
+            },
+            "description": "Recherche partielle (insensible à la casse) sur les 4 identifiants les plus pertinents : numero_ecrou, nom, numero_cni, numero_passeport. Toujours paginé à 10/page, comme le listing normal. Combinable avec `categorie_penale` dans la même requête (ex: `?search=Mballa&categorie_penale=prevenus`)."
+          }
+        },
+        {
           "name": "Lister les détenus par catégorie pénale",
           "event": [
             {

@@ -195,6 +195,18 @@ Le classement est recalculé à chaque appel à partir des mandats **actifs** de
 
 Un détenu peut changer de catégorie automatiquement en ajoutant un nouveau mandat (section 8) — ce n'est jamais assigné manuellement.
 
+### 3.2 Rechercher un détenu
+
+```
+GET /detenus?search=Mballa
+```
+Recherche partielle (insensible à la casse) sur les 4 identifiants les plus utiles pour retrouver quelqu'un : `numero_ecrou`, `nom`, `numero_cni`, `numero_passeport`. Toujours paginé à 10/page, comme le listing normal — `search` est un filtre de plus sur la même requête, pas un endpoint différent.
+
+Combinable avec `categorie_penale` dans le même appel :
+```
+GET /detenus?search=Mballa&categorie_penale=prevenus&page=2
+```
+
 ---
 
 ## 4. Consulter le détail d'un détenu

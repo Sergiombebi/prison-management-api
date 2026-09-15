@@ -35,9 +35,29 @@ class DetenuController extends Controller
             $query = $this->applyCategoriePenale($query, $request->query('categorie_penale'));
         }
 
+        if ($request->filled('search')) {
+            $this->applySearch($query, $request->query('search'));
+        }
+
         $detenus = $query->latest('id')->paginate(self::PER_PAGE);
 
         return DetenuListResource::collection($detenus);
+    }
+
+    /**
+     * Recherche sur les 4 identifiants les plus pertinents pour retrouver un détenu :
+     * numéro d'écrou, nom, CNI, passeport.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<Detenu> $query
+     */
+    private function applySearch($query, string $term): void
+    {
+        $query->where(function ($q) use ($term) {
+            $q->where('numero_ecrou', 'like', "%{$term}%")
+                ->orWhere('nom', 'like', "%{$term}%")
+                ->orWhere('numero_cni', 'like', "%{$term}%")
+                ->orWhere('numero_passeport', 'like', "%{$term}%");
+        });
     }
 
     /**
