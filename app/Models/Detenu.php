@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Detenu extends Model
 {
@@ -66,6 +67,11 @@ class Detenu extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function mandas(): HasMany
+    {
+        return $this->hasMany(Mandas::class);
     }
 
     public function getAgeAttribute(): ?int

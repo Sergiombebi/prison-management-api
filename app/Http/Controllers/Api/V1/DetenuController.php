@@ -93,13 +93,20 @@ class DetenuController extends Controller
 
     public function destroy(Request $request, Detenu $detenu)
     {
-        $detenu->update([
-            'est_present' => false,
-            'updated_by' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($request, $detenu) {
+            $detenu->update([
+                'est_present' => false,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            $detenu->mandas()->update([
+                'est_actif' => false,
+                'updated_by' => $request->user()->id,
+            ]);
+        });
 
         return response()->json([
-            'message' => 'Le détenu a été marqué comme non présent.',
+            'message' => 'Le détenu (et ses mandats) ont été marqués comme non présents.',
             'data' => new DetenuResource($detenu->fresh(['createdBy', 'updatedBy'])),
         ]);
     }

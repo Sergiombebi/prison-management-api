@@ -417,6 +417,200 @@
           }
         }
       ]
+    },
+    {
+      "name": "Mandas",
+      "item": [
+        {
+          "name": "Créer un mandat - Détention provisoire",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "type_statut_penal", "value": "Détention provisoire", "type": "text", "description": "Détention provisoire | Exécution de peine | Appellant | Cassationnaire" },
+                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
+                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
+                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
+                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
+                { "key": "reference_mandat", "value": "REF-2026-001", "type": "text" },
+                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
+                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
+                { "key": "objets_personnels", "value": "Montre, téléphone", "type": "text" },
+                { "key": "autorite_penitentiaire", "value": "Régisseur", "type": "text" },
+                { "key": "etat_physique_arrivee", "value": "Bon état", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "mandas"]
+            },
+            "description": "Crée le mandat d'un détenu existant (utilise l'id du dernier détenu créé dans cette collection). Pour 'Détention provisoire', seuls les champs communs sont requis."
+          }
+        },
+        {
+          "name": "Créer un mandat - Exécution de peine (champs jugement manquants → 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "type_statut_penal", "value": "Exécution de peine", "type": "text" },
+                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
+                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
+                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
+                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
+                { "key": "reference_mandat", "value": "REF-2026-002", "type": "text" },
+                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
+                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "mandas"]
+            },
+            "description": "Cas d'erreur : 'Exécution de peine' (et Appellant/Cassationnaire) exigent aussi les champs de jugement (date_jugement, reference_jugement, tribunal_jugement, motif_jugement, peine_prononcee) → 422."
+          }
+        },
+        {
+          "name": "Créer un mandat - Appellant (complet)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "type_statut_penal", "value": "Appellant", "type": "text" },
+                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
+                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
+                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
+                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
+                { "key": "reference_mandat", "value": "REF-2026-003", "type": "text" },
+                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
+                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
+                { "key": "date_jugement", "value": "2026-02-01", "type": "text" },
+                { "key": "reference_jugement", "value": "JUG-2026-001", "type": "text" },
+                { "key": "tribunal_jugement", "value": "TGI Douala", "type": "text" },
+                { "key": "motif_jugement", "value": "Motif du jugement", "type": "text" },
+                { "key": "peine_prononcee", "value": "5 ans d'emprisonnement", "type": "text" },
+                { "key": "date_appel", "value": "2026-03-01", "type": "text" },
+                { "key": "tribunal_appel", "value": "Cour d'Appel de Douala", "type": "text" },
+                { "key": "decision_appel", "value": "Peine confirmée", "type": "text" },
+                { "key": "observations_appel", "value": "", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "mandas"]
+            },
+            "description": "'Appellant' exige les champs jugement ET les champs appel (date_appel, tribunal_appel, decision_appel)."
+          }
+        },
+        {
+          "name": "Créer un mandat - Cassationnaire (complet)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "type_statut_penal", "value": "Cassationnaire", "type": "text" },
+                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
+                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
+                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
+                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
+                { "key": "reference_mandat", "value": "REF-2026-004", "type": "text" },
+                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
+                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
+                { "key": "date_jugement", "value": "2026-02-01", "type": "text" },
+                { "key": "reference_jugement", "value": "JUG-2026-002", "type": "text" },
+                { "key": "tribunal_jugement", "value": "TGI Douala", "type": "text" },
+                { "key": "motif_jugement", "value": "Motif du jugement", "type": "text" },
+                { "key": "peine_prononcee", "value": "5 ans d'emprisonnement", "type": "text" },
+                { "key": "date_cassation", "value": "2026-04-01", "type": "text" },
+                { "key": "tribunal_cassation", "value": "Cour Suprême", "type": "text" },
+                { "key": "decision_cassation", "value": "Pourvoi rejeté", "type": "text" },
+                { "key": "observations_cassation", "value": "", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "mandas"]
+            },
+            "description": "'Cassationnaire' exige les champs jugement ET les champs cassation (date_cassation, tribunal_cassation, decision_cassation)."
+          }
+        }
+      ]
     }
   ]
 }
