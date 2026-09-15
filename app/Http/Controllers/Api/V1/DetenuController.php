@@ -40,20 +40,6 @@ class DetenuController extends Controller
     {
         $data = $request->validated();
 
-        if ($request->hasFile('photo_face')) {
-            $uploaded = $this->cloudinary->upload($request->file('photo_face'), 'sgp/detenus/face');
-            $data['photo_face_url'] = $uploaded['url'];
-            $data['photo_face_public_id'] = $uploaded['public_id'];
-        }
-
-        if ($request->hasFile('photo_profil')) {
-            $uploaded = $this->cloudinary->upload($request->file('photo_profil'), 'sgp/detenus/profil');
-            $data['photo_profil_url'] = $uploaded['url'];
-            $data['photo_profil_public_id'] = $uploaded['public_id'];
-        }
-
-        unset($data['photo_face'], $data['photo_profil']);
-
         $data['est_present'] = true;
         $data['created_by'] = $request->user()->id;
         $data['updated_by'] = $request->user()->id;
@@ -69,21 +55,15 @@ class DetenuController extends Controller
     {
         $data = $request->validated();
 
-        if ($request->hasFile('photo_face')) {
+        // Une nouvelle photo a été fournie (déjà uploadée sur Cloudinary via
+        // POST /detenus/photos) : on supprime l'ancienne pour ne pas la laisser orpheline.
+        if (array_key_exists('photo_face_public_id', $data) && $detenu->photo_face_public_id !== $data['photo_face_public_id']) {
             $this->cloudinary->delete($detenu->photo_face_public_id);
-            $uploaded = $this->cloudinary->upload($request->file('photo_face'), 'sgp/detenus/face');
-            $data['photo_face_url'] = $uploaded['url'];
-            $data['photo_face_public_id'] = $uploaded['public_id'];
         }
 
-        if ($request->hasFile('photo_profil')) {
+        if (array_key_exists('photo_profil_public_id', $data) && $detenu->photo_profil_public_id !== $data['photo_profil_public_id']) {
             $this->cloudinary->delete($detenu->photo_profil_public_id);
-            $uploaded = $this->cloudinary->upload($request->file('photo_profil'), 'sgp/detenus/profil');
-            $data['photo_profil_url'] = $uploaded['url'];
-            $data['photo_profil_public_id'] = $uploaded['public_id'];
         }
-
-        unset($data['photo_face'], $data['photo_profil']);
 
         $data['updated_by'] = $request->user()->id;
 

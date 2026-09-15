@@ -1,25 +1,15 @@
 {
   "info": {
     "name": "SGP API",
-    "description": "Collection API du backend SGP (Système de Gestion Pénitentiaire) — Laravel.\n\nAuthentification par token Sanctum : après un login réussi, le token est automatiquement stocké dans la variable de collection `token` et réutilisé par les requêtes protégées (header `Authorization: Bearer {{token}}`).\n\nComptes de test seedés (`php artisan db:seed`) — mot de passe commun : `password`\n- admin / admin@sgp.local (role: admin)\n- eric.agent / agent@sgp.local (role: agent)\n- sophie.medecin / medecin@sgp.local (role: medecin)",
+    "description": "Collection API du backend SGP (Système de Gestion Pénitentiaire) — Laravel.\n\nAuthentification par token Sanctum : après un login réussi, le token est automatiquement stocké dans la variable de collection `token` et réutilisé par les requêtes protégées (header `Authorization: Bearer {{token}}`).\n\n**Tout est en JSON**, y compris la création/modification d'un détenu. Le seul endroit qui utilise `multipart/form-data` est l'upload de photo (`POST /detenus/photos`), parce qu'un fichier binaire ne peut pas être encodé en JSON. Le flux est : on upload d'abord la photo, on récupère son URL Cloudinary + son public_id, puis on les inclut comme simples chaînes de texte dans le JSON de création/modification du détenu.\n\nComptes de test seedés (`php artisan db:seed`) — mot de passe commun : `password`\n- admin / admin@sgp.local (role: admin)\n- eric.agent / agent@sgp.local (role: agent)\n- sophie.medecin / medecin@sgp.local (role: medecin)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "base_url",
-      "value": "http://127.0.0.1:8000/api/v1",
-      "type": "string"
-    },
-    {
-      "key": "token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "detenu_id",
-      "value": "",
-      "type": "string"
-    }
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "detenu_id", "value": "", "type": "string" },
+    { "key": "photo_face_url", "value": "", "type": "string" },
+    { "key": "photo_face_public_id", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -172,6 +162,48 @@
       "name": "Détenus",
       "item": [
         {
+          "name": "Uploader une photo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('photo_face_url', body.data.url);",
+                  "    pm.collectionVariables.set('photo_face_public_id', body.data.public_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "photo", "type": "file", "src": [], "description": "Le fichier image (jpg/png), max 5 Mo" },
+                { "key": "type", "value": "face", "type": "text", "description": "'face' ou 'profil'" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/photos",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "photos"]
+            },
+            "description": "Seul endpoint en multipart/form-data de toute la collection — c'est le seul endroit où un vrai fichier binaire transite, ce que JSON ne peut pas transporter nativement. Upload la photo sur Cloudinary et retourne son URL + public_id, à réutiliser tels quels (comme simples chaînes) dans les endpoints de création/modification de détenu, qui restent en JSON pur. Stocke automatiquement l'URL et le public_id dans les variables de collection."
+          }
+        },
+        {
           "name": "Créer un détenu",
           "event": [
             {
@@ -194,36 +226,20 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "numero_ecrou", "value": "2026-000123", "type": "text", "description": "Obligatoire, unique. Saisi librement par l'agent." },
-                { "key": "nom", "value": "Mballa Jean", "type": "text" },
-                { "key": "sexe", "value": "Masculin", "type": "text", "description": "Masculin ou Féminin" },
-                { "key": "date_naissance", "value": "1990-05-14", "type": "text" },
-                { "key": "lieu_naissance", "value": "Yaoundé", "type": "text" },
-                { "key": "nationalite", "value": "Cameroun", "type": "text" },
-                { "key": "profession", "value": "Menuisier", "type": "text" },
-                { "key": "nom_pere", "value": "Mballa Pierre", "type": "text" },
-                { "key": "nom_mere", "value": "Ateba Marie", "type": "text" },
-                { "key": "numero_cni", "value": "100200300", "type": "text", "description": "Optionnel, mais unique s'il est renseigné (détection de réincarcération)" },
-                { "key": "numero_passeport", "value": "", "type": "text" },
-                { "key": "contact_urgence_nom", "value": "Ateba Paul", "type": "text" },
-                { "key": "contact_urgence_lien_parente", "value": "Frère", "type": "text" },
-                { "key": "contact_urgence_telephone", "value": "699999999", "type": "text" },
-                { "key": "photo_face", "type": "file", "src": [] },
-                { "key": "photo_profil", "type": "file", "src": [] }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-000123\",\n    \"nom\": \"Mballa Jean\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1990-05-14\",\n    \"lieu_naissance\": \"Yaoundé\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Menuisier\",\n    \"nom_pere\": \"Mballa Pierre\",\n    \"nom_mere\": \"Ateba Marie\",\n    \"numero_cni\": \"100200300\",\n    \"contact_urgence_nom\": \"Ateba Paul\",\n    \"contact_urgence_lien_parente\": \"Frère\",\n    \"contact_urgence_telephone\": \"699999999\",\n    \"photo_face_url\": \"{{photo_face_url}}\",\n    \"photo_face_public_id\": \"{{photo_face_public_id}}\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus",
               "host": ["{{base_url}}"],
               "path": ["detenus"]
             },
-            "description": "Crée une nouvelle fiche détenu. Protégé (nécessite le token). Les photos sont envoyées directement à Cloudinary ; la réponse contient les URLs publiques. Les champs numero_ecrou, numero_cni et numero_passeport doivent être uniques."
+            "description": "Crée une nouvelle fiche détenu, en JSON pur. `photo_face_url`/`photo_face_public_id` sont optionnels — laissez-les vides si vous n'avez pas exécuté 'Uploader une photo' avant, ou les deux doivent être fournis ensemble (jamais l'un sans l'autre). numero_ecrou/numero_cni/numero_passeport doivent être uniques."
           }
         },
         {
@@ -244,28 +260,20 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "numero_ecrou", "value": "2026-000123", "type": "text", "description": "Rejouez ce test après avoir créé une première fois ce même numéro." },
-                { "key": "nom", "value": "Autre Personne", "type": "text" },
-                { "key": "sexe", "value": "Masculin", "type": "text" },
-                { "key": "date_naissance", "value": "1995-01-01", "type": "text" },
-                { "key": "lieu_naissance", "value": "Douala", "type": "text" },
-                { "key": "profession", "value": "Chauffeur", "type": "text" },
-                { "key": "nom_pere", "value": "X", "type": "text" },
-                { "key": "nom_mere", "value": "Y", "type": "text" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-000123\",\n    \"nom\": \"Autre Personne\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1995-01-01\",\n    \"lieu_naissance\": \"Douala\",\n    \"profession\": \"Chauffeur\",\n    \"nom_pere\": \"X\",\n    \"nom_mere\": \"Y\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus",
               "host": ["{{base_url}}"],
               "path": ["detenus"]
             },
-            "description": "Cas d'erreur : numéro d'écrou déjà utilisé -> 422 avec message explicite."
+            "description": "Cas d'erreur : numéro d'écrou déjà utilisé (rejouez après avoir créé une première fois ce même numéro) -> 422 avec message explicite."
           }
         },
         {
@@ -301,7 +309,7 @@
               "path": ["detenus"],
               "query": [{ "key": "page", "value": "1" }]
             },
-            "description": "Liste paginée (10 détenus par page), vue résumée (sans les données sensibles complètes). `meta.total`, `meta.last_page` etc. permettent de construire la pagination côté frontend. Changez `page` pour naviguer."
+            "description": "Liste paginée (10 détenus par page). Renvoie exactement les colonnes de la liste de l'ancienne application C# : écrou, nom, sexe, dates, lieu, nationalité, profession, contact, statut pénal/date incarcération/motif/type mandat (tirés du mandat courant), et présence."
           }
         },
         {
@@ -330,7 +338,7 @@
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}"]
             },
-            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection."
+            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris ses photos, la liste de tous ses mandats, et qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection."
           }
         },
         {
@@ -349,37 +357,22 @@
             }
           ],
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "_method", "value": "PUT", "type": "text", "description": "Obligatoire pour l'upload de fichiers : PHP ne lit pas le multipart en PUT direct. On POST avec ce champ, Laravel route vers la mise à jour." },
-                { "key": "numero_ecrou", "value": "2026-000123", "type": "text" },
-                { "key": "nom", "value": "Mballa Jean-Pierre", "type": "text", "description": "Exemple de champ modifié" },
-                { "key": "sexe", "value": "Masculin", "type": "text" },
-                { "key": "date_naissance", "value": "1990-05-14", "type": "text" },
-                { "key": "lieu_naissance", "value": "Yaoundé", "type": "text" },
-                { "key": "nationalite", "value": "Cameroun", "type": "text" },
-                { "key": "profession", "value": "Menuisier", "type": "text" },
-                { "key": "nom_pere", "value": "Mballa Pierre", "type": "text" },
-                { "key": "nom_mere", "value": "Ateba Marie", "type": "text" },
-                { "key": "numero_cni", "value": "100200300", "type": "text" },
-                { "key": "contact_urgence_nom", "value": "Ateba Paul", "type": "text" },
-                { "key": "contact_urgence_lien_parente", "value": "Frère", "type": "text" },
-                { "key": "contact_urgence_telephone", "value": "699999999", "type": "text" },
-                { "key": "photo_face", "type": "file", "src": [], "description": "Optionnel : ne fournir que si vous voulez remplacer la photo (l'ancienne est supprimée de Cloudinary)" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-000123\",\n    \"nom\": \"Mballa Jean-Pierre\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1990-05-14\",\n    \"lieu_naissance\": \"Yaoundé\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Menuisier\",\n    \"nom_pere\": \"Mballa Pierre\",\n    \"nom_mere\": \"Ateba Marie\",\n    \"numero_cni\": \"100200300\",\n    \"contact_urgence_nom\": \"Ateba Paul\",\n    \"contact_urgence_lien_parente\": \"Frère\",\n    \"contact_urgence_telephone\": \"699999999\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}",
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}"]
             },
-            "description": "Met à jour la fiche complète d'un détenu (tous les champs obligatoires doivent être renvoyés, comme un nouveau formulaire soumis). numero_ecrou/numero_cni/numero_passeport restent uniques mais ignorent le détenu courant."
+            "description": "PUT en JSON pur (plus besoin du contournement '_method=PUT' maintenant que les photos ne transitent plus par cet endpoint). Met à jour la fiche complète du détenu (tous les champs obligatoires doivent être renvoyés). Pour changer une photo, appelez d'abord 'Uploader une photo' puis incluez photo_face_url/photo_face_public_id ici — l'ancienne photo est automatiquement supprimée de Cloudinary. Ne rien envoyer pour ces champs conserve la photo actuelle."
           }
         },
         {
@@ -413,7 +406,7 @@
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}"]
             },
-            "description": "Ne supprime jamais la ligne en base : passe est_present à false (le détenu n'est plus physiquement présent, quelle que soit la raison). L'historique détaillé des sorties viendra dans une table séparée."
+            "description": "Ne supprime jamais la ligne en base : passe est_present à false (le détenu n'est plus physiquement présent, quelle que soit la raison), et cascade la même désactivation (est_actif=false) sur tous ses mandats."
           }
         }
       ]
@@ -439,31 +432,20 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "type_statut_penal", "value": "Détention provisoire", "type": "text", "description": "Détention provisoire | Exécution de peine | Appellant | Cassationnaire" },
-                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
-                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
-                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
-                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
-                { "key": "reference_mandat", "value": "REF-2026-001", "type": "text" },
-                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
-                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
-                { "key": "objets_personnels", "value": "Montre, téléphone", "type": "text" },
-                { "key": "autorite_penitentiaire", "value": "Régisseur", "type": "text" },
-                { "key": "etat_physique_arrivee", "value": "Bon état", "type": "text" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-001\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"objets_personnels\": \"Montre, téléphone\",\n    \"autorite_penitentiaire\": \"Régisseur\",\n    \"etat_physique_arrivee\": \"Bon état\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}", "mandas"]
             },
-            "description": "Crée le mandat d'un détenu existant (utilise l'id du dernier détenu créé dans cette collection). Pour 'Détention provisoire', seuls les champs communs sont requis."
+            "description": "Crée le mandat d'un détenu existant (utilise l'id du dernier détenu créé). Pour 'Détention provisoire', seuls les champs communs sont requis."
           }
         },
         {
@@ -484,21 +466,13 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "type_statut_penal", "value": "Exécution de peine", "type": "text" },
-                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
-                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
-                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
-                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
-                { "key": "reference_mandat", "value": "REF-2026-002", "type": "text" },
-                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
-                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Exécution de peine\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-002\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -526,30 +500,13 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "type_statut_penal", "value": "Appellant", "type": "text" },
-                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
-                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
-                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
-                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
-                { "key": "reference_mandat", "value": "REF-2026-003", "type": "text" },
-                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
-                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
-                { "key": "date_jugement", "value": "2026-02-01", "type": "text" },
-                { "key": "reference_jugement", "value": "JUG-2026-001", "type": "text" },
-                { "key": "tribunal_jugement", "value": "TGI Douala", "type": "text" },
-                { "key": "motif_jugement", "value": "Motif du jugement", "type": "text" },
-                { "key": "peine_prononcee", "value": "5 ans d'emprisonnement", "type": "text" },
-                { "key": "date_appel", "value": "2026-03-01", "type": "text" },
-                { "key": "tribunal_appel", "value": "Cour d'Appel de Douala", "type": "text" },
-                { "key": "decision_appel", "value": "Peine confirmée", "type": "text" },
-                { "key": "observations_appel", "value": "", "type": "text" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Appellant\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-003\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-001\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_appel\": \"2026-03-01\",\n    \"tribunal_appel\": \"Cour d'Appel de Douala\",\n    \"decision_appel\": \"Peine confirmée\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",
@@ -577,30 +534,13 @@
           "request": {
             "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "type_statut_penal", "value": "Cassationnaire", "type": "text" },
-                { "key": "date_incarceration", "value": "2026-01-10", "type": "text" },
-                { "key": "autorite_signataire", "value": "Procureur de la République", "type": "text" },
-                { "key": "motif_detention", "value": "Vol qualifié", "type": "text" },
-                { "key": "type_mandat", "value": "Mandat de dépôt", "type": "text" },
-                { "key": "reference_mandat", "value": "REF-2026-004", "type": "text" },
-                { "key": "date_signature_mandat", "value": "2026-01-10", "type": "text" },
-                { "key": "date_expiration_mandat", "value": "2026-04-10", "type": "text" },
-                { "key": "date_jugement", "value": "2026-02-01", "type": "text" },
-                { "key": "reference_jugement", "value": "JUG-2026-002", "type": "text" },
-                { "key": "tribunal_jugement", "value": "TGI Douala", "type": "text" },
-                { "key": "motif_jugement", "value": "Motif du jugement", "type": "text" },
-                { "key": "peine_prononcee", "value": "5 ans d'emprisonnement", "type": "text" },
-                { "key": "date_cassation", "value": "2026-04-01", "type": "text" },
-                { "key": "tribunal_cassation", "value": "Cour Suprême", "type": "text" },
-                { "key": "decision_cassation", "value": "Pourvoi rejeté", "type": "text" },
-                { "key": "observations_cassation", "value": "", "type": "text" }
-              ]
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Cassationnaire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-004\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2026-04-10\",\n    \"date_jugement\": \"2026-02-01\",\n    \"reference_jugement\": \"JUG-2026-002\",\n    \"tribunal_jugement\": \"TGI Douala\",\n    \"motif_jugement\": \"Motif du jugement\",\n    \"peine_prononcee\": \"5 ans d'emprisonnement\",\n    \"date_cassation\": \"2026-04-01\",\n    \"tribunal_cassation\": \"Cour Suprême\",\n    \"decision_cassation\": \"Pourvoi rejeté\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/detenus/{{detenu_id}}/mandas",

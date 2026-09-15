@@ -46,8 +46,10 @@ class StoreDetenuRequest extends FormRequest
 
             'anthropometrie' => ['nullable', 'string'],
 
-            'photo_face' => ['nullable', 'image', 'max:5120'],
-            'photo_profil' => ['nullable', 'image', 'max:5120'],
+            'photo_face_url' => ['nullable', 'string', 'url', 'max:2048', 'required_with:photo_face_public_id'],
+            'photo_face_public_id' => ['nullable', 'string', 'max:255', 'required_with:photo_face_url'],
+            'photo_profil_url' => ['nullable', 'string', 'url', 'max:2048', 'required_with:photo_profil_public_id'],
+            'photo_profil_public_id' => ['nullable', 'string', 'max:255', 'required_with:photo_profil_url'],
         ];
     }
 
@@ -62,6 +64,10 @@ class StoreDetenuRequest extends FormRequest
             'numero_cni.unique' => "Ce numéro de CNI est déjà associé à un autre détenu (possible réincarcération).",
             'numero_passeport.unique' => "Ce numéro de passeport est déjà associé à un autre détenu (possible réincarcération).",
             'date_naissance.before' => 'La date de naissance doit être antérieure à aujourd\'hui.',
+            'photo_face_url.required_with' => "Le public_id doit être accompagné de l'URL de la photo de face.",
+            'photo_face_public_id.required_with' => "L'URL de la photo de face doit être accompagnée de son public_id (retournés ensemble par /detenus/photos).",
+            'photo_profil_url.required_with' => "Le public_id doit être accompagné de l'URL de la photo de profil.",
+            'photo_profil_public_id.required_with' => "L'URL de la photo de profil doit être accompagnée de son public_id (retournés ensemble par /detenus/photos).",
         ];
     }
 }
