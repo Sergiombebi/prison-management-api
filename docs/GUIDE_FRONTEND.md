@@ -214,7 +214,7 @@ GET /detenus?search=Mballa&categorie_penale=prevenus&page=2
 ```
 GET /detenus/{id}
 ```
-Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, et qui l'a créé/modifié :
+Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, sa cellule actuelle, et qui l'a créé/modifié :
 ```json
 {
   "data": {
@@ -229,12 +229,18 @@ Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, et qu
     "mandas": [
       { "id": 1, "detenu_id": 1, "type_statut_penal": "Détention provisoire", "date_incarceration": "...", "...": "...", "est_actif": true }
     ],
+    "cellule_actuelle": {
+      "id": 5, "detenu_id": 1, "cellule": { "id": 3, "numero": "C1", "bloc": "A" },
+      "date_affectation": "...", "date_fin": null, "est_active": true, "motif_affectation": null
+    },
     "created_by": { "id": 1, "nom": "Admin", "...": "..." },
     "updated_by": { "id": 1, "nom": "Admin", "...": "..." },
     "created_at": "...", "updated_at": "..."
   }
 }
 ```
+`cellule_actuelle` vaut `null` si le détenu n'est actuellement affecté à aucune cellule (jamais affecté, ou sorti — voir section 10).
+
 `id` inexistant → `404`.
 
 ---
@@ -410,7 +416,91 @@ Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n
 
 ---
 
-## 10. Récapitulatif des codes d'erreur
+## 10. Sorties : libérations, décès, évasions, transferts
+
+Un détenu peut quitter l'établissement de **4 façons différentes**, chacune avec son propre écran côté frontend et son propre endpoint côté backend — ce sont des événements distincts, pas un simple statut à changer :
+
+```
+POST /detenus/{id}/sorties/liberation-normale
+POST /detenus/{id}/sorties/deces
+POST /detenus/{id}/sorties/transfert
+POST /detenus/{id}/sorties/evasion
+```
+
+Toutes les 4 créent une ligne dans l'historique des sorties (voir 10.5) et renvoient `201` avec la même forme de réponse (`SortieResource`) :
+```json
+{
+  "data": {
+    "id": 1, "detenu_id": 1,
+    "mandas_id": null, "mandas": null,
+    "type_sortie": "deces",
+    "date_sortie": "2026-09-16",
+    "motif": null, "destination": null, "cause": "Arrêt cardiaque", "observation": null,
+    "sortie_definitive": true,
+    "created_by": { "...": "..." }, "updated_by": { "...": "..." },
+    "created_at": "...", "updated_at": "..."
+  }
+}
+```
+
+Détenu déjà désactivé (`est_present=false`) → `409`, même logique que pour modifier/sanctionner un détenu (section 5) : il faut d'abord le restaurer (section 7) si c'était une erreur, sinon c'est qu'il a déjà une sortie enregistrée.
+
+### 10.1 Libération normale — attention, c'est liée à un **mandat précis**, pas au détenu
+
+```json
+POST /detenus/{id}/sorties/liberation-normale
+{ "mandas_id": 12, "date_sortie": "2026-09-16", "motif": "Fin de peine", "observation": "..." }
+```
+`mandas_id` (obligatoire) : le mandat qui est libéré. Doit appartenir à ce détenu et être encore actif, sinon `422`.
+
+**Pourquoi un mandat et pas juste le détenu ?** Un détenu peut avoir plusieurs mandats actifs en même temps (catégorie DPAC, section 3.1). Libérer un mandat ne fait sortir le détenu **que s'il ne lui reste aucun autre mandat actif après coup** :
+- Un seul mandat actif → il est clôturé → le détenu sort réellement (`est_present` passe à `false`, cellule libérée, sanctions actives terminées).
+- Plusieurs mandats actifs (DPAC) → seul le mandat visé est clôturé, le détenu **reste incarcéré** sur ses autres mandats (`est_present` ne change pas, rien d'autre n'est touché).
+
+La réponse dit toujours explicitement ce qui s'est passé via `sortie_definitive` (`true`/`false`) — **le frontend doit lire ce champ**, pas juste supposer que "libération = sortie", pour afficher le bon message à l'agent (ex: *"Détenu libéré du dossier REF-2026-001, toujours incarcéré sur 1 autre mandat"* si `false`).
+
+### 10.2 Décès
+
+```json
+POST /detenus/{id}/sorties/deces
+{ "date_sortie": "2026-09-16", "cause": "Arrêt cardiaque", "observation": "..." }
+```
+`cause` obligatoire. Toujours une sortie définitive (`sortie_definitive: true`), quel que soit le nombre de mandats en cours : tous les mandats encore actifs du détenu sont clôturés.
+
+### 10.3 Transfert vers un autre établissement
+
+```json
+POST /detenus/{id}/sorties/transfert
+{ "date_sortie": "2026-09-16", "destination": "Prison Centrale de Yaoundé", "motif": "...", "observation": "..." }
+```
+`destination` obligatoire (nom de l'établissement d'accueil). Toujours définitif, comme le décès.
+
+### 10.4 Évasion
+
+```json
+POST /detenus/{id}/sorties/evasion
+{ "date_sortie": "2026-09-16", "cause": "...", "observation": "..." }
+```
+`cause`/`observation` facultatifs (les circonstances ne sont pas toujours connues au moment de la déclaration). Toujours définitif.
+
+### 10.5 Historique et archive
+
+```
+GET /detenus/{id}/sorties          (historique des sorties de CE détenu)
+GET /sorties                       (archive globale, tous détenus, paginée 20/page)
+GET /sorties?type_sortie=deces     (filtrée par type)
+```
+Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`, `evasion`. Valeur invalide → `422`.
+
+`GET /detenus/{id}/sorties` a un intérêt même après une sortie définitive : si le détenu est un jour restauré (section 7, réincarcération), l'historique de ses sorties précédentes reste consultable.
+
+### 10.6 Ce que ces endpoints ne sont PAS
+
+`DELETE /detenus/{id}` (section 6) **reste un mécanisme séparé**, réservé à la correction administrative (dossier créé par erreur, doublon) — il n'enregistre aucune sortie dans `/sorties` et ne doit jamais être utilisé pour une vraie sortie de détenu. Les 4 endpoints ci-dessus sont les seuls à utiliser pour un événement réel (libération, décès, évasion, transfert).
+
+---
+
+## 11. Récapitulatif des codes d'erreur
 
 | Code | Signification | Action frontend |
 |---|---|---|
@@ -423,7 +513,7 @@ Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n
 
 ---
 
-## 11. Récapitulatif de tous les endpoints
+## 12. Récapitulatif de tous les endpoints
 
 | Méthode | Route | Protégé | Description |
 |---|---|---|---|
@@ -433,7 +523,7 @@ Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n
 | `POST` | `/detenus/photos` | Oui | Upload d'1 ou 2 photos (multipart) |
 | `POST` | `/detenus` | Oui | Créer un détenu (JSON) |
 | `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`) |
-| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats) |
+| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + cellule actuelle) |
 | `PUT` | `/detenus/{id}` | Oui | Modifier (JSON) |
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
 | `POST` | `/detenus/{id}/restore` | Oui | Restaurer (+ ses mandats) |
@@ -455,3 +545,9 @@ Libère la cellule disciplinaire et marque la sanction terminée. **Le détenu n
 | `GET` | `/types-sanction` | Oui | Lister les types de sanction |
 | `POST` | `/types-sanction` | Oui | Créer un type de sanction |
 | `PUT` | `/types-sanction/{id}` | Oui | Modifier/désactiver un type de sanction |
+| `POST` | `/detenus/{id}/sorties/liberation-normale` | Oui | Libérer un mandat précis (sort le détenu seulement si c'était son dernier mandat actif) |
+| `POST` | `/detenus/{id}/sorties/deces` | Oui | Enregistrer un décès (sortie définitive) |
+| `POST` | `/detenus/{id}/sorties/transfert` | Oui | Enregistrer un transfert vers un autre établissement (sortie définitive) |
+| `POST` | `/detenus/{id}/sorties/evasion` | Oui | Enregistrer une évasion (sortie définitive) |
+| `GET` | `/detenus/{id}/sorties` | Oui | Historique des sorties du détenu |
+| `GET` | `/sorties?type_sortie=...` | Oui | Archive globale des sorties, paginée, filtrable par type |

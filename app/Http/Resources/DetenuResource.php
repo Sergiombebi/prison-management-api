@@ -51,6 +51,10 @@ class DetenuResource extends JsonResource
             'est_present' => $this->est_present,
 
             'mandas' => MandasResource::collection($this->whenLoaded('mandas')),
+            'cellule_actuelle' => $this->when(
+                $this->relationLoaded('affectationActive'),
+                fn () => $this->affectationActive ? new AffectationResource($this->affectationActive) : null
+            ),
 
             'created_by' => new UserResource($this->whenLoaded('createdBy')),
             'updated_by' => new UserResource($this->whenLoaded('updatedBy')),

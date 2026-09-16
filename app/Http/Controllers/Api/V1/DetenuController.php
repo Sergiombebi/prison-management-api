@@ -18,7 +18,7 @@ class DetenuController extends Controller
 {
     private const PER_PAGE = 10;
 
-    private const RELATIONS = ['createdBy', 'updatedBy', 'mandas'];
+    private const RELATIONS = ['createdBy', 'updatedBy', 'mandas', 'affectationActive.cellule'];
 
     public function __construct(
         private readonly CloudinaryUploadService $cloudinary,

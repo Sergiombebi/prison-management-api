@@ -14,7 +14,15 @@
     { "key": "cellule_id", "value": "", "type": "string" },
     { "key": "cellule_disciplinaire_id", "value": "", "type": "string" },
     { "key": "sanction_id", "value": "", "type": "string" },
-    { "key": "type_sanction_id", "value": "", "type": "string" }
+    { "key": "type_sanction_id", "value": "", "type": "string" },
+    { "key": "detenu_id_liberation", "value": "", "type": "string" },
+    { "key": "mandas_id_liberation", "value": "", "type": "string" },
+    { "key": "detenu_id_dpac", "value": "", "type": "string" },
+    { "key": "mandas_id_dpac_a", "value": "", "type": "string" },
+    { "key": "mandas_id_dpac_b", "value": "", "type": "string" },
+    { "key": "detenu_id_deces", "value": "", "type": "string" },
+    { "key": "detenu_id_transfert", "value": "", "type": "string" },
+    { "key": "detenu_id_evasion", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -411,7 +419,7 @@
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}"]
             },
-            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris ses photos, la liste de tous ses mandats, et qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection."
+            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris ses photos, la liste de tous ses mandats, et qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection. Depuis l'ajout de la gestion des sorties, inclut aussi cellule_actuelle (numéro/bloc de la cellule où se trouve le détenu, null s'il n'est affecté à aucune cellule)."
           }
         },
         {
@@ -1173,6 +1181,748 @@
               "path": ["sanctions", "{{sanction_id}}"]
             },
             "description": "Pour une sanction saisie par erreur - passe est_actif à false sans toucher à la cellule disciplinaire (utilisez 'Terminer' pour ça)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sorties (libérations, décès, évasions, transferts)",
+      "description": "4 façons dont un détenu peut quitter l'établissement. Une libération normale cible un mandat précis et ne fait réellement sortir le détenu (sortie_definitive=true) que s'il ne lui reste aucun autre mandat actif - décès/évasion/transfert font toujours sortir le détenu, quel que soit le nombre de mandats en cours. destroy()/restore() sur /detenus restent un mécanisme séparé, réservé à la correction administrative (dossier créé par erreur) - ils n'enregistrent aucune sortie.",
+      "item": [
+        {
+          "name": "Créer un détenu (pour libération simple)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_liberation', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SORTIE-001\",\n    \"nom\": \"Etoundi Roger\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Détenu de démonstration avec un seul mandat, pour illustrer une libération normale qui le fait réellement sortir de l'établissement."
+          }
+        },
+        {
+          "name": "Créer un mandat à libérer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('mandas_id_liberation', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-SORTIE-001\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_liberation}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_liberation}}", "mandas"]
+            },
+            "description": "Le seul mandat de ce détenu : une fois libéré, plus aucun mandat actif ne reste, donc le détenu sort réellement."
+          }
+        },
+        {
+          "name": "Libérer un mandat (libération normale) - sortie définitive",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mandas_id\": \"{{mandas_id_liberation}}\",\n    \"date_sortie\": \"2026-09-16\",\n    \"motif\": \"Fin de peine\",\n    \"observation\": \"Libéré à l'expiration de la peine prononcée.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_liberation}}/sorties/liberation-normale",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_liberation}}", "sorties", "liberation-normale"]
+            },
+            "description": "Clôture le mandat indiqué. Comme c'était le dernier mandat actif du détenu, sortie_definitive=true dans la réponse : le détenu passe est_present=false, sa cellule est libérée et ses éventuelles sanctions actives sont terminées."
+          }
+        },
+        {
+          "name": "Créer un détenu (DPAC - plusieurs mandats actifs)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_dpac', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SORTIE-002\",\n    \"nom\": \"Ngono Sylvie\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Détenu de démonstration avec deux mandats actifs simultanés (DPAC), pour illustrer qu'une libération normale peut ne libérer qu'un dossier sans faire sortir le détenu."
+          }
+        },
+        {
+          "name": "Créer le mandat A (celui qu'on va libérer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('mandas_id_dpac_a', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-SORTIE-002-A\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_dpac}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_dpac}}", "mandas"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Créer le mandat B (reste actif après la libération de A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('mandas_id_dpac_b', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type_statut_penal\": \"Détention provisoire\",\n    \"date_incarceration\": \"2026-01-10\",\n    \"autorite_signataire\": \"Procureur de la République\",\n    \"motif_detention\": \"Vol qualifié\",\n    \"type_mandat\": \"Mandat de dépôt\",\n    \"reference_mandat\": \"REF-2026-SORTIE-002-B\",\n    \"date_signature_mandat\": \"2026-01-10\",\n    \"date_expiration_mandat\": \"2027-04-10\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_dpac}}/mandas",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_dpac}}", "mandas"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Libérer le mandat A - le détenu reste incarcéré",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mandas_id\": \"{{mandas_id_dpac_a}}\",\n    \"date_sortie\": \"2026-09-16\",\n    \"motif\": \"Relaxe sur ce dossier\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_dpac}}/sorties/liberation-normale",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_dpac}}", "sorties", "liberation-normale"]
+            },
+            "description": "Le mandat A est clôturé, mais le mandat B est toujours actif : sortie_definitive=false dans la réponse, le détenu reste est_present=true, sa cellule et ses sanctions ne sont pas touchées."
+          }
+        },
+        {
+          "name": "Libération normale sur un mandat déjà clôturé (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mandas_id\": \"{{mandas_id_dpac_a}}\",\n    \"date_sortie\": \"2026-09-16\",\n    \"motif\": \"Nouvelle tentative sur un mandat déjà libéré\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_dpac}}/sorties/liberation-normale",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_dpac}}", "sorties", "liberation-normale"]
+            },
+            "description": "Le mandat A vient d'être clôturé par la requête précédente : la validation rejette mandas_id (doit être actif)."
+          }
+        },
+        {
+          "name": "Créer un détenu (pour décès)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_deces', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SORTIE-003\",\n    \"nom\": \"Biya Marcel\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Enregistrer un décès (cause manquante -> 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_deces}}/sorties/deces",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_deces}}", "sorties", "deces"]
+            },
+            "description": "La cause du décès est obligatoire."
+          }
+        },
+        {
+          "name": "Enregistrer un décès",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\",\n    \"cause\": \"Arrêt cardiaque\",\n    \"observation\": \"Décès constaté par le médecin de l'établissement.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_deces}}/sorties/deces",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_deces}}", "sorties", "deces"]
+            },
+            "description": "Sortie toujours définitive quel que soit le nombre de mandats en cours : est_present=false, tous les mandats actifs sont clôturés, cellule libérée, sanctions actives terminées."
+          }
+        },
+        {
+          "name": "Enregistrer une sortie sur un détenu déjà sorti (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 409', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_deces}}/sorties/evasion",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_deces}}", "sorties", "evasion"]
+            },
+            "description": "Ce détenu vient d'être déclaré décédé (est_present=false) : toute nouvelle sortie est bloquée tant qu'il n'est pas restauré via POST /detenus/{id}/restore."
+          }
+        },
+        {
+          "name": "Créer un détenu (pour transfert)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_transfert', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SORTIE-004\",\n    \"nom\": \"Fouda Alain\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Enregistrer un transfert (destination manquante -> 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_transfert}}/sorties/transfert",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_transfert}}", "sorties", "transfert"]
+            },
+            "description": "L'établissement de destination est obligatoire."
+          }
+        },
+        {
+          "name": "Enregistrer un transfert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\",\n    \"destination\": \"Prison Centrale de Yaoundé\",\n    \"motif\": \"Rapprochement familial\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_transfert}}/sorties/transfert",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_transfert}}", "sorties", "transfert"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Créer un détenu (pour évasion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_evasion', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SORTIE-005\",\n    \"nom\": \"Manga Serge\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Enregistrer une évasion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_sortie\": \"2026-09-16\",\n    \"cause\": \"Évasion lors de la promenade en cour\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_evasion}}/sorties/evasion",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_evasion}}", "sorties", "evasion"]
+            },
+            "description": "cause/observation sont facultatifs pour une évasion (les circonstances ne sont pas toujours connues immédiatement)."
+          }
+        },
+        {
+          "name": "Historique des sorties d'un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_deces}}/sorties",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_deces}}", "sorties"]
+            },
+            "description": "Toutes les sorties enregistrées pour ce détenu (utile en cas de réincarcération après restauration)."
+          }
+        },
+        {
+          "name": "Archive globale des sorties (tous détenus)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sorties",
+              "host": ["{{base_url}}"],
+              "path": ["sorties"]
+            },
+            "description": "Liste paginée de toutes les sorties, tous détenus et tous types confondus, triée par date décroissante."
+          }
+        },
+        {
+          "name": "Archive filtrée par type (décès)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sorties?type_sortie=deces",
+              "host": ["{{base_url}}"],
+              "path": ["sorties"],
+              "query": [{ "key": "type_sortie", "value": "deces" }]
+            },
+            "description": "Même endpoint que ci-dessus, filtré par type_sortie (liberation_normale, deces, transfert ou evasion)."
+          }
+        },
+        {
+          "name": "Archive avec un type invalide (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sorties?type_sortie=inconnu",
+              "host": ["{{base_url}}"],
+              "path": ["sorties"],
+              "query": [{ "key": "type_sortie", "value": "inconnu" }]
+            },
+            "description": ""
           }
         }
       ]

@@ -97,6 +97,25 @@ class Detenu extends Model
         return $this->hasMany(Sanction::class);
     }
 
+    public function sorties(): HasMany
+    {
+        return $this->hasMany(SortieDetenu::class);
+    }
+
+    /**
+     * Vrai si le détenu a encore au moins un mandat actif. Utilisé lors d'une libération
+     * normale (après avoir clôturé le mandat concerné) pour savoir si le détenu quitte
+     * réellement l'établissement, ou s'il reste incarcéré sur un autre mandat (DPAC).
+     */
+    public function aUnMandatActif(): bool
+    {
+        $query = Mandas::query()->where('detenu_id', $this->id);
+
+        self::whereMandatActif($query);
+
+        return $query->exists();
+    }
+
     public function getAgeAttribute(): ?int
     {
         return $this->date_naissance?->age;

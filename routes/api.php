@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
 use App\Http\Controllers\Api\V1\MandasController;
 use App\Http\Controllers\Api\V1\SanctionController;
+use App\Http\Controllers\Api\V1\SortieDetenuController;
 use App\Http\Controllers\Api\V1\TypeSanctionController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,5 +49,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/types-sanction', [TypeSanctionController::class, 'index']);
         Route::post('/types-sanction', [TypeSanctionController::class, 'store']);
         Route::put('/types-sanction/{typeSanction}', [TypeSanctionController::class, 'update']);
+
+        Route::get('/sorties', [SortieDetenuController::class, 'archive']);
+        Route::get('/detenus/{detenu}/sorties', [SortieDetenuController::class, 'index']);
+        Route::post('/detenus/{detenu}/sorties/liberation-normale', [SortieDetenuController::class, 'liberationNormale']);
+        Route::post('/detenus/{detenu}/sorties/deces', [SortieDetenuController::class, 'deces']);
+        Route::post('/detenus/{detenu}/sorties/transfert', [SortieDetenuController::class, 'transfert']);
+        Route::post('/detenus/{detenu}/sorties/evasion', [SortieDetenuController::class, 'evasion']);
     });
 });
