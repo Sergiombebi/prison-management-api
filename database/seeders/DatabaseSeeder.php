@@ -35,5 +35,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'eric.agent',
             'email' => 'agent@sgp.local',
         ]);
+
+        $this->call(DemoDataSeeder::class);
     }
 }
