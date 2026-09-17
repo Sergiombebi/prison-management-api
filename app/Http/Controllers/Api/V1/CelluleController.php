@@ -29,7 +29,7 @@ class CelluleController extends Controller
 
     public function show(Cellule $cellule)
     {
-        return new CelluleResource($cellule->load(self::RELATIONS));
+        return new CelluleResource($cellule->load([...self::RELATIONS, 'affectationsActives.detenu']));
     }
 
     public function store(StoreCelluleRequest $request)

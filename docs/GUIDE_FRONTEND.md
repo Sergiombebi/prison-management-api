@@ -163,6 +163,8 @@ Réponse `200` :
       "date_incarceration": "2026-01-10",
       "motif_detention": "Vol qualifié",
       "type_mandat": "Mandat de dépôt",
+      "categorie_penale": "prevenus",
+      "cellule_actuelle": { "id": 3, "numero": "C1", "bloc": "A" },
       "est_present": true
     }
   ],
@@ -173,6 +175,12 @@ Réponse `200` :
 Utilisez `meta.last_page`/`meta.total` pour construire les contrôles de pagination, et `page=N` pour naviguer.
 
 C'est une **vue résumée** (colonnes de l'ancienne liste C#) — pour tous les détails d'un détenu, voir section 4.
+
+`statut_penal`/`date_incarceration`/`motif_detention`/`type_mandat` viennent du **mandat actif le plus pertinent** (jamais un mandat désactivé ou expiré). Si le détenu a plusieurs mandats actifs en même temps (DPAC) incarcérés à la même date, "Exécution de peine" est prioritaire dans le choix — un détenu qui purge une peine reste avant tout un condamné, même avec un autre mandat en parallèle.
+
+`categorie_penale` est la même valeur que celle utilisée pour filtrer (voir 3.1), déjà calculée sur chaque ligne — pas besoin de la redéduire côté frontend.
+
+`cellule_actuelle` (`id`/`numero`/`bloc`) est `null` si le détenu n'est affecté à aucune cellule.
 
 ### 3.1 Filtrer par catégorie pénale (Prévenus / Condamnés / Appellants / Cassationnaires / DPAC)
 
@@ -206,6 +214,15 @@ Combinable avec `categorie_penale` dans le même appel :
 ```
 GET /detenus?search=Mballa&categorie_penale=prevenus&page=2
 ```
+
+### 3.3 Détenus sans cellule
+
+```
+GET /detenus?sans_cellule=1
+```
+Filtre les détenus présents qui n'ont **aucune cellule active** — jamais affecté, ou sorti d'une sanction en cellule disciplinaire (`POST /sanctions/{id}/terminer`, section 9.4) sans avoir été réaffecté depuis. Combinable avec `search`/`categorie_penale`/`page` comme les autres filtres.
+
+Utile pour construire une vue "à loger" côté frontend : rien ne signale ces détenus ailleurs que ce filtre.
 
 ---
 
@@ -364,7 +381,7 @@ POST   /cellules
 GET    /cellules/{id}
 PUT    /cellules/{id}
 ```
-Réponse d'une cellule :
+Réponse d'une cellule (listing, `GET /cellules`) :
 ```json
 {
   "id": 1, "numero": "C1", "bloc": "A", "type_cellule": "Normale",
@@ -373,16 +390,31 @@ Réponse d'une cellule :
 ```
 `effectif_actuel`/`places_disponibles` sont **toujours calculés à la volée**, jamais stockés — donc jamais de dérive possible. `PUT` rejette (`422`) toute réduction de capacité en dessous de l'effectif déjà présent.
 
+Le **détail** d'une cellule (`GET /cellules/{id}`) ajoute la liste des occupants actuels, absente du listing pour ne pas alourdir chaque page :
+```json
+{
+  "id": 1, "numero": "C1", "bloc": "A", "...": "...",
+  "occupants": [
+    { "detenu_id": 12, "numero_ecrou": "2026-000123", "nom": "Mballa Jean", "date_affectation": "2026-09-01T08:00:00+00:00" }
+  ]
+}
+```
+
 ### 9.2 Affecter un détenu à une cellule
 
 ```
 POST /detenus/{id}/affectations
-GET  /detenus/{id}/affectations   (historique complet)
+GET  /detenus/{id}/affectations   (historique du détenu)
+GET  /affectations                (fil global, paginé 20/page, plus récent d'abord)
 ```
 ```json
 { "cellule_id": 3, "motif_affectation": "Arrivée à l'établissement" }
 ```
 Clôture automatiquement l'affectation active précédente (`date_fin`) au lieu de la supprimer — vrai historique, jamais de perte de trace. Rejette (`422`) si la cellule est déjà pleine ; ce contrôle est fait **avec verrouillage côté serveur**, donc même deux affectations envoyées en même temps ne peuvent pas faire déborder une cellule.
+
+Rejette aussi (`422`, message *"Le détenu est déjà dans cette cellule"*) si le détenu est déjà affecté à cette cellule précise — évite un aller-retour inutile qui clôturerait puis rouvrirait l'affectation (et ferait perdre la vraie date d'arrivée dans l'historique).
+
+`GET /affectations` (sans `{id}`) donne une vue d'ensemble tous détenus confondus — utile pour un fil "mouvements récents" sans ouvrir chaque dossier. Chaque ligne inclut `detenu` (`id`/`numero_ecrou`/`nom`) en plus de `cellule`.
 
 ### 9.3 Types de sanction
 
@@ -396,6 +428,8 @@ Le type de sanction n'est **plus du texte libre** : c'est une petite table de r�
 ### 9.4 Sanctions
 
 ```
+GET    /sanctions                     (liste globale, paginée 10/page)
+GET    /detenus/{id}/sanctions        (toutes les sanctions d'un détenu)
 POST   /detenus/{id}/sanctions
 GET    /sanctions/{id}
 PUT    /sanctions/{id}
@@ -403,6 +437,10 @@ DELETE /sanctions/{id}
 POST   /sanctions/{id}/terminer
 ```
 `type_sanction_id` référence un type actif de `/types-sanction` (un type désactivé est refusé, `422`). `statut` (`"À venir"`/`"En cours"`/`"Terminée"`) est **calculé à la lecture** à partir des dates — jamais stocké.
+
+`GET /sanctions` accepte deux filtres combinables : `?detenu_id=12` et `?est_actif=1` (ou `0`). Chaque ligne inclut `detenu` (`id`/`numero_ecrou`/`nom`), triée par `date_debut` décroissante.
+
+`GET /detenus/{id}/sanctions` retourne l'historique complet d'un détenu (actives et terminées), sans pagination — comme `GET /detenus/{id}/affectations`.
 
 **Point important** : si `cellule_disciplinaire_id` est fourni à la création, le détenu est **réellement déplacé** dans cette cellule (nouvelle affectation créée, ancienne clôturée) — l'occupation des cellules reste toujours exacte. La cellule d'où il venait est mémorisée automatiquement (`cellule_origine` dans la réponse).
 
@@ -522,7 +560,7 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 | `POST` | `/auth/logout` | Oui | Déconnexion |
 | `POST` | `/detenus/photos` | Oui | Upload d'1 ou 2 photos (multipart) |
 | `POST` | `/detenus` | Oui | Créer un détenu (JSON) |
-| `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`) |
+| `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`, `sans_cellule`) |
 | `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + cellule actuelle) |
 | `PUT` | `/detenus/{id}` | Oui | Modifier (JSON) |
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
@@ -533,10 +571,13 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 | `DELETE` | `/mandas/{id}` | Oui | Désactiver un mandat (soft) |
 | `GET` | `/cellules?page=N` | Oui | Liste paginée des cellules |
 | `POST` | `/cellules` | Oui | Créer une cellule |
-| `GET` | `/cellules/{id}` | Oui | Détail d'une cellule |
+| `GET` | `/cellules/{id}` | Oui | Détail d'une cellule (+ occupants actuels) |
 | `PUT` | `/cellules/{id}` | Oui | Modifier une cellule |
 | `POST` | `/detenus/{id}/affectations` | Oui | Affecter le détenu à une cellule |
 | `GET` | `/detenus/{id}/affectations` | Oui | Historique des affectations du détenu |
+| `GET` | `/affectations` | Oui | Fil global des mouvements de cellule, paginé, plus récent d'abord |
+| `GET` | `/sanctions` | Oui | Liste globale des sanctions, paginée (+ `detenu_id`, `est_actif`) |
+| `GET` | `/detenus/{id}/sanctions` | Oui | Toutes les sanctions d'un détenu |
 | `POST` | `/detenus/{id}/sanctions` | Oui | Créer une sanction |
 | `GET` | `/sanctions/{id}` | Oui | Détail d'une sanction |
 | `PUT` | `/sanctions/{id}` | Oui | Modifier une sanction |

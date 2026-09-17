@@ -15,11 +15,47 @@ use Illuminate\Support\Facades\DB;
 
 class SanctionController extends Controller
 {
+    private const PER_PAGE = 10;
+
     private const RELATIONS = ['typeSanction', 'celluleDisciplinaire', 'celluleOrigine', 'affectationDisciplinaire', 'createdBy', 'updatedBy'];
 
     public function __construct(
         private readonly CelluleAssignmentService $assignment,
     ) {
+    }
+
+    /**
+     * Liste globale des sanctions, tous détenus confondus, filtrable par détenu et par
+     * statut actif/inactif.
+     */
+    public function index(Request $request)
+    {
+        $query = Sanction::query()->with([...self::RELATIONS, 'detenu']);
+
+        if ($request->filled('detenu_id')) {
+            $query->where('detenu_id', $request->query('detenu_id'));
+        }
+
+        if ($request->has('est_actif')) {
+            $query->where('est_actif', $request->boolean('est_actif'));
+        }
+
+        $sanctions = $query->latest('date_debut')->paginate(self::PER_PAGE);
+
+        return SanctionResource::collection($sanctions);
+    }
+
+    /**
+     * Toutes les sanctions d'un détenu précis (actives et passées).
+     */
+    public function indexForDetenu(Detenu $detenu)
+    {
+        $sanctions = $detenu->sanctions()
+            ->with(self::RELATIONS)
+            ->orderByDesc('date_debut')
+            ->get();
+
+        return SanctionResource::collection($sanctions);
     }
 
     public function show(Sanction $sanction)

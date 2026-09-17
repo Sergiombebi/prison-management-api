@@ -29,7 +29,7 @@ class DetenuController extends Controller
     {
         $query = Detenu::query()
             ->where('est_present', true)
-            ->with('latestMandas');
+            ->with(['mandasActifs', 'affectationActive.cellule']);
 
         if ($request->filled('categorie_penale')) {
             $query = $this->applyCategoriePenale($query, $request->query('categorie_penale'));
@@ -37,6 +37,10 @@ class DetenuController extends Controller
 
         if ($request->filled('search')) {
             $this->applySearch($query, $request->query('search'));
+        }
+
+        if ($request->boolean('sans_cellule')) {
+            $query->sansCellule();
         }
 
         $detenus = $query->latest('id')->paginate(self::PER_PAGE);

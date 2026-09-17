@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CategoriePenale;
 use App\Enums\TypeStatutPenal;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,9 +78,15 @@ class Detenu extends Model
         return $this->hasMany(Mandas::class);
     }
 
-    public function latestMandas(): HasOne
+    /**
+     * Mandats actifs (même règle que whereMandatActif) - à charger avec ->with() pour
+     * afficher le "mandat courant" et la catégorie pénale sans requête par ligne.
+     */
+    public function mandasActifs(): HasMany
     {
-        return $this->hasOne(Mandas::class)->latestOfMany('date_incarceration');
+        return $this->hasMany(Mandas::class)->where(function (Builder $q) {
+            self::whereMandatActif($q);
+        });
     }
 
     public function affectations(): HasMany
@@ -122,6 +129,62 @@ class Detenu extends Model
     }
 
     /**
+     * Parmi les mandats actifs déjà chargés (relation mandasActifs), celui à afficher comme
+     * "mandat courant" sur la liste des détenus. En cas d'égalité de date d'incarcération,
+     * "Exécution de peine" prime sur les autres statuts (un détenu qui purge une peine,
+     * même avec un autre mandat en parallèle, est avant tout un condamné), puis
+     * Cassationnaire, puis Appellant, puis Détention provisoire.
+     */
+    public function getMandatCourantAttribute(): ?Mandas
+    {
+        if (! $this->relationLoaded('mandasActifs')) {
+            return null;
+        }
+
+        return $this->mandasActifs
+            ->sortBy(fn (Mandas $m) => [
+                self::prioriteStatut($m->type_statut_penal),
+                -$m->date_incarceration->timestamp,
+                -$m->id,
+            ])
+            ->first();
+    }
+
+    /**
+     * Catégorie pénale calculée à partir des mandats actifs déjà chargés (relation
+     * mandasActifs) - même règle que les scopes prevenus/condamnes/appellants/
+     * cassationnaires/dpac, mais en mémoire pour éviter une requête par détenu affiché.
+     */
+    public function getCategoriePenaleCalculeeAttribute(): ?CategoriePenale
+    {
+        if (! $this->relationLoaded('mandasActifs') || $this->mandasActifs->isEmpty()) {
+            return null;
+        }
+
+        $types = $this->mandasActifs->pluck('type_statut_penal');
+        $aExecution = $types->contains(TypeStatutPenal::ExecutionDePeine);
+
+        return match (true) {
+            $types->count() >= 2 && $aExecution => CategoriePenale::Dpac,
+            $types->count() === 1 && $aExecution => CategoriePenale::Condamnes,
+            $types->contains(TypeStatutPenal::Cassationnaire) && ! $aExecution => CategoriePenale::Cassationnaires,
+            $types->contains(TypeStatutPenal::Appellant) && ! $aExecution => CategoriePenale::Appellants,
+            $types->every(fn (TypeStatutPenal $t) => $t === TypeStatutPenal::DetentionProvisoire) => CategoriePenale::Prevenus,
+            default => null,
+        };
+    }
+
+    private static function prioriteStatut(TypeStatutPenal $type): int
+    {
+        return match ($type) {
+            TypeStatutPenal::ExecutionDePeine => 1,
+            TypeStatutPenal::Cassationnaire => 2,
+            TypeStatutPenal::Appellant => 3,
+            TypeStatutPenal::DetentionProvisoire => 4,
+        };
+    }
+
+    /**
      * Un mandat "actif" est un mandat non désactivé dont la sortie n'est pas encore passée.
      */
     private static function whereMandatActif(Builder $query): void
@@ -150,14 +213,17 @@ class Detenu extends Model
 
     /**
      * Exactement un mandat actif, et c'est une "Exécution de peine".
+     *
+     * Utilise whereHas() avec un opérateur de comptage plutôt que withCount()->having()
+     * pour éviter une clause HAVING sur une requête non-agrégée une fois combinée à
+     * paginate() (échoue selon le moteur SQL - "HAVING clause on a non-aggregate query").
      */
     public function scopeCondamnes(Builder $query): Builder
     {
         return $query
-            ->withCount(['mandas as mandats_actifs_count' => function (Builder $q) {
+            ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-            }])
-            ->having('mandats_actifs_count', '=', 1)
+            }, '=', 1)
             ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
                 $q->where('type_statut_penal', TypeStatutPenal::ExecutionDePeine->value);
@@ -204,13 +270,21 @@ class Detenu extends Model
     public function scopeDpac(Builder $query): Builder
     {
         return $query
-            ->withCount(['mandas as mandats_actifs_count' => function (Builder $q) {
+            ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-            }])
-            ->having('mandats_actifs_count', '>=', 2)
+            }, '>=', 2)
             ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
                 $q->where('type_statut_penal', TypeStatutPenal::ExecutionDePeine->value);
             });
+    }
+
+    /**
+     * Détenus présents sans aucune cellule active (jamais affecté, ou sorti d'une sanction
+     * en cellule disciplinaire sans avoir été réaffecté depuis).
+     */
+    public function scopeSansCellule(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('affectationActive');
     }
 }

@@ -32,6 +32,17 @@ class CelluleAssignmentService
         return DB::transaction(function () use ($detenu, $celluleId, $date, $motif, $userId) {
             $cellule = Cellule::query()->lockForUpdate()->findOrFail($celluleId);
 
+            $dejaDansCetteCellule = $detenu->affectations()
+                ->whereNull('date_fin')
+                ->where('cellule_id', $cellule->id)
+                ->exists();
+
+            if ($dejaDansCetteCellule) {
+                throw ValidationException::withMessages([
+                    'cellule_id' => ["Le détenu est déjà dans la cellule {$cellule->numero}."],
+                ]);
+            }
+
             $effectifActuel = $cellule->affectationsActives()->count();
 
             if ($effectifActuel >= $cellule->capacite_max) {

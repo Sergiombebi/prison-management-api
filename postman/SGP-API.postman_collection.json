@@ -596,6 +596,36 @@
             },
             "description": "Cas de réincarcération : jouez d'abord 'Créer un détenu' (avec numero_cni=100200300) puis 'Supprimer (désactiver)', puis cette requête avec le même numero_cni mais un numero_ecrou différent -> 409, avec `conflict.detenu_id` et `conflict.restore_url` pointant vers le dossier désactivé à restaurer plutôt que de créer un doublon."
           }
+        },
+        {
+          "name": "Lister les détenus sans cellule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus?sans_cellule=1",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"],
+              "query": [{ "key": "sans_cellule", "value": "1" }]
+            },
+            "description": "Détenus présents qui n'ont aucune cellule active (jamais affecté, ou sorti d'une sanction en cellule disciplinaire - POST /sanctions/{id}/terminer - sans avoir été réaffecté depuis). Combinable avec search/categorie_penale/page."
+          }
         }
       ]
     },
@@ -1181,6 +1211,128 @@
               "path": ["sanctions", "{{sanction_id}}"]
             },
             "description": "Pour une sanction saisie par erreur - passe est_actif à false sans toucher à la cellule disciplinaire (utilisez 'Terminer' pour ça)."
+          }
+        },
+        {
+          "name": "Réaffecter dans la même cellule (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cellule_id\": \"{{cellule_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/affectations",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "affectations"]
+            },
+            "description": "Rejoué juste après 'Affecter un détenu à une cellule' : le détenu est déjà dans {{cellule_id}}, donc rejeté avec 'Le détenu est déjà dans cette cellule' - même si la cellule a de la place (évite de clôturer puis rouvrir l'affectation et perdre la vraie date d'arrivée)."
+          }
+        },
+        {
+          "name": "Fil global des affectations (toutes cellules)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/affectations",
+              "host": ["{{base_url}}"],
+              "path": ["affectations"]
+            },
+            "description": "Tous les mouvements de cellule, tous détenus confondus, paginés (20/page) du plus récent au plus ancien. Chaque ligne inclut detenu (id/numero_ecrou/nom) en plus de cellule - utile pour un fil 'mouvements récents' sans ouvrir chaque dossier."
+          }
+        },
+        {
+          "name": "Lister toutes les sanctions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sanctions?est_actif=1",
+              "host": ["{{base_url}}"],
+              "path": ["sanctions"],
+              "query": [{ "key": "est_actif", "value": "1" }]
+            },
+            "description": "Liste globale paginée (10/page), triée par date_debut décroissante. Filtres combinables : detenu_id, est_actif (0 ou 1). Chaque ligne inclut detenu (id/numero_ecrou/nom)."
+          }
+        },
+        {
+          "name": "Lister les sanctions d'un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id}}/sanctions",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id}}", "sanctions"]
+            },
+            "description": "Historique complet des sanctions d'un détenu (actives et terminées), sans pagination - comme GET /detenus/{id}/affectations."
           }
         }
       ]

@@ -15,6 +15,11 @@ class AffectationResource extends JsonResource
         return [
             'id' => $this->id,
             'detenu_id' => $this->detenu_id,
+            'detenu' => $this->when($this->relationLoaded('detenu'), fn () => [
+                'id' => $this->detenu->id,
+                'numero_ecrou' => $this->detenu->numero_ecrou,
+                'nom' => $this->detenu->nom,
+            ]),
             'cellule' => $this->when($this->relationLoaded('cellule'), fn () => [
                 'id' => $this->cellule->id,
                 'numero' => $this->cellule->numero,

@@ -12,7 +12,7 @@ class DetenuListResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $mandat = $this->whenLoaded('latestMandas');
+        $mandat = $this->relationLoaded('mandasActifs') ? $this->mandat_courant : null;
 
         return [
             'id' => $this->id,
@@ -28,6 +28,15 @@ class DetenuListResource extends JsonResource
             'date_incarceration' => $mandat?->date_incarceration?->toDateString(),
             'motif_detention' => $mandat?->motif_detention,
             'type_mandat' => $mandat?->type_mandat,
+            'categorie_penale' => $this->when($this->relationLoaded('mandasActifs'), fn () => $this->categorie_penale_calculee?->value),
+            'cellule_actuelle' => $this->when(
+                $this->relationLoaded('affectationActive'),
+                fn () => $this->affectationActive ? [
+                    'id' => $this->affectationActive->cellule->id,
+                    'numero' => $this->affectationActive->cellule->numero,
+                    'bloc' => $this->affectationActive->cellule->bloc,
+                ] : null
+            ),
             'est_present' => $this->est_present,
         ];
     }
