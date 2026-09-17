@@ -3,12 +3,15 @@
 use App\Http\Controllers\Api\V1\AffectationController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CelluleController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
 use App\Http\Controllers\Api\V1\MandasController;
 use App\Http\Controllers\Api\V1\SanctionController;
 use App\Http\Controllers\Api\V1\SortieDetenuController;
+use App\Http\Controllers\Api\V1\SuiviMedicalController;
 use App\Http\Controllers\Api\V1\TypeSanctionController;
+use App\Http\Controllers\Api\V1\VisiteController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -59,5 +62,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/detenus/{detenu}/sorties/deces', [SortieDetenuController::class, 'deces']);
         Route::post('/detenus/{detenu}/sorties/transfert', [SortieDetenuController::class, 'transfert']);
         Route::post('/detenus/{detenu}/sorties/evasion', [SortieDetenuController::class, 'evasion']);
+
+        Route::get('/suivis-medicaux', [SuiviMedicalController::class, 'index']);
+        Route::get('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'indexForDetenu']);
+        Route::post('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'store']);
+
+        Route::get('/visites', [VisiteController::class, 'index']);
+        Route::get('/detenus/{detenu}/visites', [VisiteController::class, 'indexForDetenu']);
+        Route::post('/detenus/{detenu}/visites', [VisiteController::class, 'store']);
+
+        Route::get('/tableau-de-bord', [DashboardController::class, 'index']);
     });
 });

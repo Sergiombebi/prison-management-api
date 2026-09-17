@@ -543,7 +543,130 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 
 ---
 
-## 11. Récapitulatif des codes d'erreur
+## 11. Santé et visites
+
+Deux modules distincts côté données, mais avec la même forme d'API que les sanctions/affectations : créer + lister par détenu + lister globalement. Aucune modification/suppression pour l'instant (pas demandé côté frontend).
+
+### 11.1 Suivi médical (consultations à l'infirmerie)
+
+```
+GET  /suivis-medicaux                     (liste globale, non paginée, plus récente d'abord)
+GET  /detenus/{id}/suivis-medicaux        (historique d'un détenu, pour l'onglet "Santé" du dossier)
+POST /detenus/{id}/suivis-medicaux
+```
+```json
+{
+  "date_consultation": "2026-09-17",
+  "type_consultation": "Consultation générale",
+  "nom_medecin": "Dr Ateba",
+  "temperature": "37,2",
+  "tension_arterielle": "12/8",
+  "poids": "70",
+  "symptomes": "Toux persistante, fièvre légère",
+  "diagnostic": "Bronchite",
+  "medicaments_prescrits": "Amoxicilline 500mg",
+  "duree_traitement": "7 jours",
+  "date_suivi": "2026-09-24"
+}
+```
+Obligatoires : `date_consultation`, `type_consultation`, `nom_medecin`, `symptomes`, `diagnostic`. Le reste est optionnel.
+
+`type_consultation` est restreint à 5 valeurs fixes (reprises de l'ancienne application, pas une table administrable comme `types-sanction`) : `Consultation générale`, `Contrôle`, `Urgence`, `Spécialiste`, `Psychiatrique`. Valeur hors liste → `422`.
+
+`temperature`/`tension_arterielle`/`poids` sont du **texte libre** (pas des nombres) pour accepter le format de saisie habituel (`"37,2"`, `"12/8"`) sans imposer de type numérique strict.
+
+Détenu désactivé → `409`, même logique que pour une sanction (section 9.4) : il faut le restaurer d'abord (section 7).
+
+### 11.2 Visites (parloir)
+
+```
+GET  /visites                     (liste globale, non paginée, plus récente d'abord)
+GET  /detenus/{id}/visites        (historique des visites reçues par un détenu)
+POST /detenus/{id}/visites
+```
+```json
+{
+  "date_visite": "2026-09-17",
+  "heure_arrivee": "14:30",
+  "duree_prevue_minutes": 30,
+  "type_visite": "Parloir familial",
+  "autorisation_prealable": true,
+  "nom_visiteur": "Ateba Paul",
+  "sexe_visiteur": "Masculin",
+  "type_piece_identite": "Carte nationale d'identité",
+  "numero_piece_identite": "100200300",
+  "telephone_visiteur": "699999999",
+  "lien_parente": "Frère/Sœur",
+  "agent_controle": "Agent Mballa",
+  "fouille_corporelle": true,
+  "objets_deposes": "Téléphone portable"
+}
+```
+Obligatoires : `date_visite`, `heure_arrivee`, `duree_prevue_minutes`, `type_visite`, `autorisation_prealable`, `nom_visiteur`, `sexe_visiteur`, `type_piece_identite`, `numero_piece_identite`, `lien_parente`, `agent_controle`. Optionnels : `telephone_visiteur`, `fouille_corporelle`, `objets_deposes`.
+
+Champs à listes fixes (référentiels de l'ancienne app, `422` si valeur hors liste) :
+| Champ | Valeurs acceptées |
+|---|---|
+| `duree_prevue_minutes` | `15`, `30`, `45`, `60` |
+| `type_visite` | `Parloir familial`, `Parloir avocat`, `Salle spécialisée`, `Bureau administratif` |
+| `sexe_visiteur` | `Masculin`, `Féminin` |
+| `type_piece_identite` | `Carte nationale d'identité`, `Passeport`, `Carte consulaire`, `Attestation d'identité` |
+| `lien_parente` | `Père/Mère`, `Époux/Épouse`, `Fils/Fille`, `Frère/Sœur`, `Oncle/Tante`, `Cousin/Cousine`, `Ami(e)`, `Avocat`, `Assistante sociale`, `Représentant consulaire`, `Autorités judiciaires`, `Autre` |
+
+`heure_debut`/`heure_fin`/`observations_visite`/`observations_securite`/`lieu_visite`/`adresse_visiteur` existent dans la réponse mais **ne sont pas dans ce formulaire de création** — ce sont des champs à renseigner après coup (ex: au départ du visiteur), pas encore d'endpoint dédié pour ça.
+
+Détenu désactivé → `409`, même logique que ci-dessus.
+
+---
+
+## 12. Tableau de bord
+
+```
+GET /tableau-de-bord
+```
+Réponse `200`, un seul objet (pas de pagination) :
+```json
+{
+  "data": {
+    "genere_le": "2026-09-17T08:12:53+00:00",
+    "effectif": 245,
+    "capacite_totale": 300,
+    "taux_occupation": 81.7,
+    "effectif_mois_precedent": 238,
+    "visites_aujourdhui": 12,
+    "sorties_prevues_mois_prochain": 5,
+    "mandats_expires": 3,
+    "sanctions_en_cours": 7,
+    "mouvements": { "incarcerations": 18, "liberations": 9, "transferements": 2, "evasions": 0, "deces": 1 },
+    "effectifs_par_categorie": { "Prevenu": 120, "Condamne": 80, "Appellant": 25, "Cassationnaire": 10, "Dpac": 10 },
+    "population_derniers_mois": [
+      { "label": "Avr.", "population": 220 },
+      { "label": "Mai", "population": 228 },
+      { "label": "Juin", "population": 231 },
+      { "label": "Juil.", "population": 235 },
+      { "label": "Août", "population": 238 },
+      { "label": "Sept.", "population": 245 }
+    ],
+    "liberables_ce_mois": [
+      { "numero_ecrou": "2026-000045", "nom": "Mballa Jean", "date_incarceration": "2024-03-10", "date_expiration": "2026-09-28", "statut": "Exécution de peine" }
+    ]
+  }
+}
+```
+
+**Point d'attention sur `effectifs_par_categorie`** : les clés (`Prevenu`, `Condamne`, `Appellant`, `Cassationnaire`, `Dpac`) sont dans une **casse différente** de celle utilisée par le filtre `?categorie_penale=` sur `GET /detenus` (`prevenus`, `condamnes`, etc. — section 3.1). C'est fait exprès : ce sont les valeurs exactes attendues par le type frontend `CategoriePenale`, distinctes du slug utilisé en query string.
+
+**Point d'attention sur `effectif_mois_precedent` et `population_derniers_mois`** : aucune table d'historique de la population n'existe en base. Ces deux valeurs sont **reconstituées** à partir de l'effectif actuel (`est_present=true`), en retirant les arrivées et en rajoutant les sorties définitives survenues depuis la date de référence. C'est une approximation cohérente, pas un relevé exact conservé jour par jour — à garder en tête si les chiffres semblent légèrement décalés après une correction manuelle de données anciennes.
+
+`taux_occupation` = cellules occupées (affectations actives) / capacité totale des cellules × 100, arrondi à 1 décimale. Peut dépasser `100` (surpopulation).
+
+`mouvements` couvre les 30 derniers jours. Une libération normale qui ne fait pas réellement sortir le détenu (DPAC, section 10.1) n'y est **pas** comptée — seules les sorties `sortie_definitive=true` sont des mouvements de population.
+
+`liberables_ce_mois` liste tous les mandats actifs dont la date d'expiration tombe ce mois-ci (pas de limite côté API — limitez l'affichage à N lignes côté frontend si besoin).
+
+---
+
+## 13. Récapitulatif des codes d'erreur
 
 | Code | Signification | Action frontend |
 |---|---|---|
@@ -556,7 +679,7 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 
 ---
 
-## 12. Récapitulatif de tous les endpoints
+## 14. Récapitulatif de tous les endpoints
 
 | Méthode | Route | Protégé | Description |
 |---|---|---|---|
@@ -597,3 +720,10 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 | `POST` | `/detenus/{id}/sorties/evasion` | Oui | Enregistrer une évasion (sortie définitive) |
 | `GET` | `/detenus/{id}/sorties` | Oui | Historique des sorties du détenu |
 | `GET` | `/sorties?type_sortie=...` | Oui | Archive globale des sorties, paginée, filtrable par type |
+| `GET` | `/suivis-medicaux` | Oui | Liste globale des consultations médicales |
+| `GET` | `/detenus/{id}/suivis-medicaux` | Oui | Historique médical d'un détenu |
+| `POST` | `/detenus/{id}/suivis-medicaux` | Oui | Enregistrer une consultation |
+| `GET` | `/visites` | Oui | Liste globale des visites |
+| `GET` | `/detenus/{id}/visites` | Oui | Historique des visites d'un détenu |
+| `POST` | `/detenus/{id}/visites` | Oui | Enregistrer une visite |
+| `GET` | `/tableau-de-bord` | Oui | Statistiques agrégées pour l'écran d'accueil |

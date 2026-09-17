@@ -22,7 +22,8 @@
     { "key": "mandas_id_dpac_b", "value": "", "type": "string" },
     { "key": "detenu_id_deces", "value": "", "type": "string" },
     { "key": "detenu_id_transfert", "value": "", "type": "string" },
-    { "key": "detenu_id_evasion", "value": "", "type": "string" }
+    { "key": "detenu_id_evasion", "value": "", "type": "string" },
+    { "key": "detenu_id_sante", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -2075,6 +2076,337 @@
               "query": [{ "key": "type_sortie", "value": "inconnu" }]
             },
             "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Santé et visites",
+      "description": "Suivi médical (consultations à l'infirmerie) et visites au parloir - regroupés sous un seul module côté frontend (\"Santé & visites\"). Les référentiels (types de consultation/visite, liens de parenté, pièces d'identité, durées) sont des listes fixes reprises de l'ancienne application, pas des tables administrables comme types-sanction.",
+      "item": [
+        {
+          "name": "Créer un détenu (pour santé et visites)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('detenu_id_sante', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numero_ecrou\": \"2026-SANTE-001\",\n    \"nom\": \"Owona Michel\",\n    \"sexe\": \"Masculin\",\n    \"date_naissance\": \"1988-03-20\",\n    \"lieu_naissance\": \"Douala\",\n    \"nationalite\": \"Cameroun\",\n    \"profession\": \"Agriculteur\",\n    \"nom_pere\": \"Père Test\",\n    \"nom_mere\": \"Mère Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus",
+              "host": ["{{base_url}}"],
+              "path": ["detenus"]
+            },
+            "description": "Détenu de démonstration pour les modules Santé et Visites."
+          }
+        },
+        {
+          "name": "Créer une consultation médicale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_consultation\": \"2026-09-17\",\n    \"type_consultation\": \"Consultation générale\",\n    \"nom_medecin\": \"Dr Ateba\",\n    \"temperature\": \"37,2\",\n    \"tension_arterielle\": \"12/8\",\n    \"poids\": \"70\",\n    \"symptomes\": \"Toux persistante, fièvre légère\",\n    \"diagnostic\": \"Bronchite\",\n    \"medicaments_prescrits\": \"Amoxicilline 500mg\",\n    \"duree_traitement\": \"7 jours\",\n    \"date_suivi\": \"2026-09-24\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/suivis-medicaux",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "suivis-medicaux"]
+            },
+            "description": "type_consultation est restreint à une liste fixe (Consultation générale, Contrôle, Urgence, Spécialiste, Psychiatrique) - référentiel de l'ancienne app, pas une table administrable. Rejette (409) si le détenu est désactivé."
+          }
+        },
+        {
+          "name": "Type de consultation invalide (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_consultation\": \"2026-09-17\",\n    \"type_consultation\": \"Chirurgie\",\n    \"nom_medecin\": \"Dr Ateba\",\n    \"symptomes\": \"Test\",\n    \"diagnostic\": \"Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/suivis-medicaux",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "suivis-medicaux"]
+            },
+            "description": "type_consultation doit être une des 5 valeurs acceptées."
+          }
+        },
+        {
+          "name": "Historique médical d'un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/suivis-medicaux",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "suivis-medicaux"]
+            },
+            "description": "Toutes les consultations de ce détenu, la plus récente d'abord. Alimente l'onglet Santé du dossier détenu."
+          }
+        },
+        {
+          "name": "Lister toutes les consultations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/suivis-medicaux",
+              "host": ["{{base_url}}"],
+              "path": ["suivis-medicaux"]
+            },
+            "description": "Liste globale, tous détenus confondus, non paginée (comme /detenus/{id}/sanctions) - la plus récente d'abord."
+          }
+        },
+        {
+          "name": "Enregistrer une visite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_visite\": \"2026-09-17\",\n    \"heure_arrivee\": \"14:30\",\n    \"duree_prevue_minutes\": 30,\n    \"type_visite\": \"Parloir familial\",\n    \"autorisation_prealable\": true,\n    \"nom_visiteur\": \"Ateba Paul\",\n    \"sexe_visiteur\": \"Masculin\",\n    \"type_piece_identite\": \"Carte nationale d'identité\",\n    \"numero_piece_identite\": \"100200300\",\n    \"telephone_visiteur\": \"699999999\",\n    \"lien_parente\": \"Frère/Sœur\",\n    \"agent_controle\": \"Agent Mballa\",\n    \"fouille_corporelle\": true,\n    \"objets_deposes\": \"Téléphone portable\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/visites",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "visites"]
+            },
+            "description": "duree_prevue_minutes accepte uniquement 15/30/45/60. type_visite, sexe_visiteur, type_piece_identite et lien_parente sont chacun restreints à une liste fixe (référentiels de l'ancienne app). Rejette (409) si le détenu est désactivé."
+          }
+        },
+        {
+          "name": "Durée de visite invalide (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date_visite\": \"2026-09-17\",\n    \"heure_arrivee\": \"14:30\",\n    \"duree_prevue_minutes\": 20,\n    \"type_visite\": \"Parloir familial\",\n    \"autorisation_prealable\": true,\n    \"nom_visiteur\": \"Ateba Paul\",\n    \"sexe_visiteur\": \"Masculin\",\n    \"type_piece_identite\": \"Carte nationale d'identité\",\n    \"numero_piece_identite\": \"100200300\",\n    \"lien_parente\": \"Frère/Sœur\",\n    \"agent_controle\": \"Agent Mballa\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/visites",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "visites"]
+            },
+            "description": "duree_prevue_minutes doit être 15, 30, 45 ou 60."
+          }
+        },
+        {
+          "name": "Historique des visites d'un détenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/detenus/{{detenu_id_sante}}/visites",
+              "host": ["{{base_url}}"],
+              "path": ["detenus", "{{detenu_id_sante}}", "visites"]
+            },
+            "description": "Toutes les visites reçues par ce détenu, la plus récente d'abord."
+          }
+        },
+        {
+          "name": "Lister toutes les visites",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/visites",
+              "host": ["{{base_url}}"],
+              "path": ["visites"]
+            },
+            "description": "Liste globale, tous détenus confondus, non paginée - la plus récente d'abord."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tableau de bord",
+      "item": [
+        {
+          "name": "Tableau de bord",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tableau-de-bord",
+              "host": ["{{base_url}}"],
+              "path": ["tableau-de-bord"]
+            },
+            "description": "Statistiques agrégées pour l'écran d'accueil : effectif, taux d'occupation, mandats expirés, sanctions en cours, mouvements des 30 derniers jours, répartition par catégorie pénale (clés Prevenu/Condamne/Appellant/Cassationnaire/Dpac - casse différente du filtre ?categorie_penale=, voir le guide frontend), population des 6 derniers mois, et détenus libérables ce mois-ci. effectif_mois_precedent et population_derniers_mois sont reconstitués à partir de l'effectif actuel (pas de table d'historique de la population) - une approximation, pas un relevé exact."
           }
         }
       ]

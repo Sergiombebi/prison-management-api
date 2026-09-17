@@ -109,6 +109,16 @@ class Detenu extends Model
         return $this->hasMany(SortieDetenu::class);
     }
 
+    public function suivisMedicaux(): HasMany
+    {
+        return $this->hasMany(SuiviMedical::class);
+    }
+
+    public function visites(): HasMany
+    {
+        return $this->hasMany(Visite::class);
+    }
+
     /**
      * Vrai si le détenu a encore au moins un mandat actif. Utilisé lors d'une libération
      * normale (après avoir clôturé le mandat concerné) pour savoir si le détenu quitte
