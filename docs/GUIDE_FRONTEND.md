@@ -231,7 +231,7 @@ Utile pour construire une vue "à loger" côté frontend : rien ne signale ces d
 ```
 GET /detenus/{id}
 ```
-Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, sa cellule actuelle, et qui l'a créé/modifié :
+Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, **toutes ses sanctions**, sa cellule actuelle, et qui l'a créé/modifié :
 ```json
 {
   "data": {
@@ -250,6 +250,9 @@ Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, sa ce
       "id": 5, "detenu_id": 1, "cellule": { "id": 3, "numero": "C1", "bloc": "A" },
       "date_affectation": "...", "date_fin": null, "est_active": true, "motif_affectation": null
     },
+    "sanctions": [
+      { "id": 1, "detenu_id": 1, "type_sanction": { "id": 1, "libelle": "Isolement" }, "motif": "...", "date_faute": "...", "date_debut": "...", "date_fin": null, "statut": "En cours", "est_actif": true, "cellule_disciplinaire": { "id": 4, "numero": "ISO1", "bloc": "ISOLEMENT" }, "cellule_origine": { "id": 3, "numero": "C1", "bloc": "A" } }
+    ],
     "created_by": { "id": 1, "nom": "Admin", "...": "..." },
     "updated_by": { "id": 1, "nom": "Admin", "...": "..." },
     "created_at": "...", "updated_at": "..."
@@ -257,6 +260,8 @@ Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, sa ce
 }
 ```
 `cellule_actuelle` vaut `null` si le détenu n'est actuellement affecté à aucune cellule (jamais affecté, ou sorti — voir section 10).
+
+`sanctions` liste l'historique complet (actives et terminées), `[]` si aucune. Même forme que `GET /detenus/{id}/sanctions` (section 9.4), sans `created_by`/`updated_by`/`affectation_disciplinaire_active` sur chaque ligne pour ne pas alourdir la fiche — appelez `GET /sanctions/{id}` si vous avez besoin de ce détail sur une sanction précise.
 
 `id` inexistant → `404`.
 
@@ -561,7 +566,7 @@ Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`,
 | `POST` | `/detenus/photos` | Oui | Upload d'1 ou 2 photos (multipart) |
 | `POST` | `/detenus` | Oui | Créer un détenu (JSON) |
 | `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`, `sans_cellule`) |
-| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + cellule actuelle) |
+| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + sanctions, + cellule actuelle) |
 | `PUT` | `/detenus/{id}` | Oui | Modifier (JSON) |
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
 | `POST` | `/detenus/{id}/restore` | Oui | Restaurer (+ ses mandats) |

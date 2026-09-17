@@ -419,7 +419,7 @@
               "host": ["{{base_url}}"],
               "path": ["detenus", "{{detenu_id}}"]
             },
-            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris ses photos, la liste de tous ses mandats, et qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection. Depuis l'ajout de la gestion des sorties, inclut aussi cellule_actuelle (numéro/bloc de la cellule où se trouve le détenu, null s'il n'est affecté à aucune cellule)."
+            "description": "Retourne tous les détails d'un détenu (fiche complète), y compris ses photos, la liste de tous ses mandats, toutes ses sanctions, et qui l'a créé/modifié. Utilise automatiquement l'id du dernier détenu créé dans cette collection. Inclut aussi cellule_actuelle (numéro/bloc de la cellule où se trouve le détenu, null s'il n'est affecté à aucune cellule)."
           }
         },
         {

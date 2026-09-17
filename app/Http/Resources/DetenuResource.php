@@ -51,6 +51,7 @@ class DetenuResource extends JsonResource
             'est_present' => $this->est_present,
 
             'mandas' => MandasResource::collection($this->whenLoaded('mandas')),
+            'sanctions' => SanctionResource::collection($this->whenLoaded('sanctions')),
             'cellule_actuelle' => $this->when(
                 $this->relationLoaded('affectationActive'),
                 fn () => $this->affectationActive ? new AffectationResource($this->affectationActive) : null
