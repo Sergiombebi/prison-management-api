@@ -231,7 +231,7 @@ Utile pour construire une vue "à loger" côté frontend : rien ne signale ces d
 ```
 GET /detenus/{id}
 ```
-Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, **toutes ses sanctions**, sa cellule actuelle, et qui l'a créé/modifié :
+Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, **toutes ses sanctions**, **son historique médical**, **ses visites reçues**, sa cellule actuelle, et qui l'a créé/modifié :
 ```json
 {
   "data": {
@@ -253,6 +253,12 @@ Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, **tou
     "sanctions": [
       { "id": 1, "detenu_id": 1, "type_sanction": { "id": 1, "libelle": "Isolement" }, "motif": "...", "date_faute": "...", "date_debut": "...", "date_fin": null, "statut": "En cours", "est_actif": true, "cellule_disciplinaire": { "id": 4, "numero": "ISO1", "bloc": "ISOLEMENT" }, "cellule_origine": { "id": 3, "numero": "C1", "bloc": "A" } }
     ],
+    "suivis_medicaux": [
+      { "id": 1, "detenu_id": 1, "date_consultation": "...", "type_consultation": "Consultation générale", "nom_medecin": "Dr Ateba", "...": "..." }
+    ],
+    "visites": [
+      { "id": 1, "detenu_id": 1, "date_visite": "...", "nom_visiteur": "...", "lien_parente": "...", "...": "..." }
+    ],
     "created_by": { "id": 1, "nom": "Admin", "...": "..." },
     "updated_by": { "id": 1, "nom": "Admin", "...": "..." },
     "created_at": "...", "updated_at": "..."
@@ -262,6 +268,8 @@ Réponse `200` avec **tous** les champs, les photos, **tous ses mandats**, **tou
 `cellule_actuelle` vaut `null` si le détenu n'est actuellement affecté à aucune cellule (jamais affecté, ou sorti — voir section 10).
 
 `sanctions` liste l'historique complet (actives et terminées), `[]` si aucune. Même forme que `GET /detenus/{id}/sanctions` (section 9.4), sans `created_by`/`updated_by`/`affectation_disciplinaire_active` sur chaque ligne pour ne pas alourdir la fiche — appelez `GET /sanctions/{id}` si vous avez besoin de ce détail sur une sanction précise.
+
+`suivis_medicaux` et `visites` listent l'historique complet, `[]` si aucun — même forme que `GET /detenus/{id}/suivis-medicaux` et `GET /detenus/{id}/visites` (section 11), sans le sous-objet `detenu` sur chaque ligne (redondant ici, vous êtes déjà sur sa fiche).
 
 `id` inexistant → `404`.
 
@@ -689,7 +697,7 @@ Réponse `200`, un seul objet (pas de pagination) :
 | `POST` | `/detenus/photos` | Oui | Upload d'1 ou 2 photos (multipart) |
 | `POST` | `/detenus` | Oui | Créer un détenu (JSON) |
 | `GET` | `/detenus?page=N` | Oui | Liste paginée des détenus actifs (+ `search`, `categorie_penale`, `sans_cellule`) |
-| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + sanctions, + cellule actuelle) |
+| `GET` | `/detenus/{id}` | Oui | Détail complet (+ mandats, + sanctions, + suivis médicaux, + visites, + cellule actuelle) |
 | `PUT` | `/detenus/{id}` | Oui | Modifier (JSON) |
 | `DELETE` | `/detenus/{id}` | Oui | Désactiver (soft) |
 | `POST` | `/detenus/{id}/restore` | Oui | Restaurer (+ ses mandats) |

@@ -6,8 +6,10 @@ use App\Models\AffectationCellule;
 use App\Models\Cellule;
 use App\Models\Detenu;
 use App\Models\Sanction;
+use App\Models\SuiviMedical;
 use App\Models\TypeSanction;
 use App\Models\User;
+use App\Models\Visite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -123,5 +125,71 @@ class DetenuShowTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonCount(0, 'data.sanctions');
+    }
+
+    public function test_la_fiche_detenu_expose_son_suivi_medical_et_ses_visites(): void
+    {
+        $detenu = Detenu::create([
+            'numero_ecrou' => 'ECR-00005',
+            'nom' => 'Rose Etoundi',
+            'sexe' => 'F',
+            'date_naissance' => '1993-04-04',
+            'lieu_naissance' => 'Yaoundé',
+            'profession' => 'Infirmière',
+            'nom_pere' => 'Père Etoundi',
+            'nom_mere' => 'Mère Etoundi',
+        ]);
+
+        SuiviMedical::create([
+            'detenu_id' => $detenu->id,
+            'date_consultation' => '2026-09-01',
+            'type_consultation' => 'Contrôle',
+            'nom_medecin' => 'Dr Ateba',
+            'symptomes' => 'RAS',
+            'diagnostic' => 'RAS',
+        ]);
+
+        Visite::create([
+            'detenu_id' => $detenu->id,
+            'date_visite' => '2026-09-01',
+            'heure_arrivee' => '10:00',
+            'duree_prevue_minutes' => 30,
+            'type_visite' => 'Parloir familial',
+            'autorisation_prealable' => true,
+            'nom_visiteur' => 'Paul Etoundi',
+            'sexe_visiteur' => 'Masculin',
+            'type_piece_identite' => "Carte nationale d'identité",
+            'numero_piece_identite' => '999888',
+            'lien_parente' => 'Frère/Sœur',
+            'agent_controle' => 'Agent X',
+        ]);
+
+        $response = $this->getJson("/api/v1/detenus/{$detenu->id}");
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data.suivis_medicaux');
+        $response->assertJsonPath('data.suivis_medicaux.0.nom_medecin', 'Dr Ateba');
+        $response->assertJsonCount(1, 'data.visites');
+        $response->assertJsonPath('data.visites.0.nom_visiteur', 'Paul Etoundi');
+    }
+
+    public function test_la_fiche_detenu_sans_suivi_ni_visite_renvoie_des_tableaux_vides(): void
+    {
+        $detenu = Detenu::create([
+            'numero_ecrou' => 'ECR-00006',
+            'nom' => 'David Essomba',
+            'sexe' => 'M',
+            'date_naissance' => '1994-05-05',
+            'lieu_naissance' => 'Douala',
+            'profession' => 'Menuisier',
+            'nom_pere' => 'Père Essomba',
+            'nom_mere' => 'Mère Essomba',
+        ]);
+
+        $response = $this->getJson("/api/v1/detenus/{$detenu->id}");
+
+        $response->assertOk();
+        $response->assertJsonCount(0, 'data.suivis_medicaux');
+        $response->assertJsonCount(0, 'data.visites');
     }
 }

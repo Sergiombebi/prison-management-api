@@ -21,6 +21,7 @@ class DetenuController extends Controller
     private const RELATIONS = [
         'createdBy', 'updatedBy', 'mandas', 'affectationActive.cellule',
         'sanctions.typeSanction', 'sanctions.celluleDisciplinaire', 'sanctions.celluleOrigine',
+        'suivisMedicaux', 'visites',
     ];
 
     public function __construct(
