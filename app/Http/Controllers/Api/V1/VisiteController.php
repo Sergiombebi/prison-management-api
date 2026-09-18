@@ -7,6 +7,7 @@ use App\Http\Requests\StoreVisiteRequest;
 use App\Http\Resources\VisiteResource;
 use App\Models\Detenu;
 use App\Models\Visite;
+use Illuminate\Http\Request;
 
 class VisiteController extends Controller
 {
@@ -15,13 +16,13 @@ class VisiteController extends Controller
     /**
      * Liste globale des visites, tous détenus confondus, la plus récente d'abord.
      */
-    public function index()
+    public function index(Request $request)
     {
         $visites = Visite::query()
             ->with([...self::RELATIONS, 'detenu'])
             ->orderByDesc('date_visite')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return VisiteResource::collection($visites);
     }
@@ -29,13 +30,13 @@ class VisiteController extends Controller
     /**
      * Historique des visites d'un détenu précis.
      */
-    public function indexForDetenu(Detenu $detenu)
+    public function indexForDetenu(Detenu $detenu, Request $request)
     {
         $visites = $detenu->visites()
             ->with(self::RELATIONS)
             ->orderByDesc('date_visite')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return VisiteResource::collection($visites);
     }

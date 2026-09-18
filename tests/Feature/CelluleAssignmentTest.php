@@ -93,7 +93,7 @@ class CelluleAssignmentTest extends TestCase
         $this->assertEquals(2, $detenu->affectations()->count());
     }
 
-    public function test_occupants_actuels_dans_le_detail_dune_cellule(): void
+    public function test_detail_dune_cellule_nexpose_plus_occupants(): void
     {
         $detenu = $this->creerDetenu(['nom' => 'Occupant Un']);
         $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
@@ -104,21 +104,41 @@ class CelluleAssignmentTest extends TestCase
         $response = $this->getJson("/api/v1/cellules/{$cellule->id}");
 
         $response->assertOk();
-        $response->assertJsonCount(1, 'data.occupants');
-        $response->assertJsonPath('data.occupants.0.nom', 'Occupant Un');
+        $response->assertJsonMissingPath('data.occupants');
     }
 
-    public function test_occupants_absent_de_la_liste_paginee_des_cellules(): void
+    public function test_detenus_dune_cellule_est_paginee(): void
     {
-        $detenu = $this->creerDetenu();
-        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
-        $this->postJson("/api/v1/detenus/{$detenu->id}/affectations", ['cellule_id' => $cellule->id])
+        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 15]);
+        $autreCellule = Cellule::create(['numero' => 'C2', 'bloc' => 'A', 'capacite_max' => 4]);
+
+        for ($i = 0; $i < 12; $i++) {
+            $detenu = $this->creerDetenu(['nom' => "Occupant $i"]);
+            $this->postJson("/api/v1/detenus/{$detenu->id}/affectations", ['cellule_id' => $cellule->id])
+                ->assertCreated();
+        }
+
+        // Un détenu d'une autre cellule ne doit jamais apparaître ici.
+        $detenuAilleurs = $this->creerDetenu(['nom' => 'Ailleurs']);
+        $this->postJson("/api/v1/detenus/{$detenuAilleurs->id}/affectations", ['cellule_id' => $autreCellule->id])
             ->assertCreated();
 
-        $response = $this->getJson('/api/v1/cellules');
+        $premierePage = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus");
+        $premierePage->assertOk();
+        $premierePage->assertJsonCount(10, 'data');
+        $premierePage->assertJsonPath('meta.total', 12);
 
-        $response->assertOk();
-        $response->assertJsonMissingPath('data.0.occupants');
+        $deuxiemePage = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?page=2");
+        $deuxiemePage->assertOk();
+        $deuxiemePage->assertJsonCount(2, 'data');
+
+        $pageReduite = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?per_page=5");
+        $pageReduite->assertOk();
+        $pageReduite->assertJsonCount(5, 'data');
+
+        $pageHorsBornes = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?per_page=50");
+        $pageHorsBornes->assertOk();
+        $pageHorsBornes->assertJsonCount(10, 'data');
     }
 
     public function test_archive_globale_des_affectations(): void

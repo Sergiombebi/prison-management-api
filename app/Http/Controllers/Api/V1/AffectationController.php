@@ -8,11 +8,10 @@ use App\Http\Resources\AffectationResource;
 use App\Models\AffectationCellule;
 use App\Models\Detenu;
 use App\Services\CelluleAssignmentService;
+use Illuminate\Http\Request;
 
 class AffectationController extends Controller
 {
-    private const PER_PAGE = 20;
-
     private const RELATIONS = ['cellule', 'createdBy', 'updatedBy'];
 
     public function __construct(
@@ -20,12 +19,12 @@ class AffectationController extends Controller
     ) {
     }
 
-    public function index(Detenu $detenu)
+    public function index(Detenu $detenu, Request $request)
     {
         $affectations = $detenu->affectations()
             ->with(self::RELATIONS)
             ->orderByDesc('date_affectation')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return AffectationResource::collection($affectations);
     }
@@ -34,13 +33,13 @@ class AffectationController extends Controller
      * Fil global des mouvements de cellule, tous détenus confondus, du plus récent au
      * plus ancien - pour repérer les mouvements récents sans ouvrir chaque dossier.
      */
-    public function archive()
+    public function archive(Request $request)
     {
         $affectations = AffectationCellule::query()
             ->with([...self::RELATIONS, 'detenu'])
             ->orderByDesc('date_affectation')
             ->orderByDesc('id')
-            ->paginate(self::PER_PAGE);
+            ->paginate($this->perPage($request));
 
         return AffectationResource::collection($affectations);
     }

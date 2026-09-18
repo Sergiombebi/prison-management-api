@@ -20,6 +20,7 @@ La collection Postman `SGP-API.postman_collection.json` contient tous ces appels
   ```
 - Les réponses qui renvoient un détenu (création, consultation, modification, suppression, restauration) ont **toujours exactement les mêmes clés** — pas besoin de gérer des formats différents selon l'endpoint appelé.
 - Un détenu n'est **jamais supprimé** de la base. "Supprimer" = passer `est_present` à `false`. Un détenu inactif disparaît de la liste et ne peut plus être modifié tant qu'il n'est pas restauré.
+- **Pagination systématique** : tous les endpoints de listing (voir le tableau de la section 14) renvoient une réponse paginée Laravel classique — `{ "data": [...], "links": {...}, "meta": {...} }` — jamais un tableau brut. Contrôlable via `?page=N` et `?per_page=N`, `per_page` étant **toujours borné entre 1 et 10** côté serveur (une valeur hors bornes est silencieusement ramenée à 1 ou 10, jamais une erreur). Sans paramètre, `per_page` vaut 10. `meta.total`/`meta.last_page` donnent de quoi construire une pagination ; `meta.per_page` confirme la valeur effectivement appliquée. Si un écran a besoin de "tout" (ex: remplir une liste déroulante), il faut boucler sur les pages côté frontend — comme c'est déjà fait pour `GET /detenus` avec `parPage: 1000`.
 
 ---
 
@@ -208,7 +209,7 @@ Un détenu peut changer de catégorie automatiquement en ajoutant un nouveau man
 ```
 GET /detenus?search=Mballa
 ```
-Recherche partielle (insensible à la casse) sur les 4 identifiants les plus utiles pour retrouver quelqu'un : `numero_ecrou`, `nom`, `numero_cni`, `numero_passeport`. Toujours paginé à 10/page, comme le listing normal — `search` est un filtre de plus sur la même requête, pas un endpoint différent.
+Recherche partielle (insensible à la casse) sur les 4 identifiants les plus utiles pour retrouver quelqu'un : `numero_ecrou`, `nom`, `numero_cni`, `numero_passeport`. Toujours paginé comme le listing normal (section 0) — `search` est un filtre de plus sur la même requête, pas un endpoint différent.
 
 Combinable avec `categorie_penale` dans le même appel :
 ```
@@ -389,12 +390,12 @@ DELETE /mandas/{id}
 ### 9.1 Cellules
 
 ```
-GET    /cellules?page=1        (paginé, 10/page)
+GET    /cellules?page=1        (paginé)
 POST   /cellules
 GET    /cellules/{id}
 PUT    /cellules/{id}
 ```
-Réponse d'une cellule (listing, `GET /cellules`) :
+Réponse d'une cellule :
 ```json
 {
   "id": 1, "numero": "C1", "bloc": "A", "type_cellule": "Normale",
@@ -403,22 +404,21 @@ Réponse d'une cellule (listing, `GET /cellules`) :
 ```
 `effectif_actuel`/`places_disponibles` sont **toujours calculés à la volée**, jamais stockés — donc jamais de dérive possible. `PUT` rejette (`422`) toute réduction de capacité en dessous de l'effectif déjà présent.
 
-Le **détail** d'une cellule (`GET /cellules/{id}`) ajoute la liste des occupants actuels, absente du listing pour ne pas alourdir chaque page :
-```json
-{
-  "id": 1, "numero": "C1", "bloc": "A", "...": "...",
-  "occupants": [
-    { "detenu_id": 12, "numero_ecrou": "2026-000123", "nom": "Mballa Jean", "date_affectation": "2026-09-01T08:00:00+00:00" }
-  ]
-}
+Même forme pour le listing et le détail — pas de champ supplémentaire sur `GET /cellules/{id}` (contrairement à `GET /detenus/{id}`). Pour voir qui occupe une cellule, voir 9.1.1 ci-dessous.
+
+### 9.1.1 Détenus présents dans une cellule (clic sur une cellule)
+
 ```
+GET /cellules/{id}/detenus
+```
+Paginé, comme tous les listings (section 0). Même forme et mêmes champs que `GET /detenus` (section 3) — `categorie_penale`, `cellule_actuelle` (qui vaudra toujours cette même cellule ici), `statut_penal`, etc. — trié par nom. C'est l'endpoint à appeler quand l'agent clique sur une cellule pour voir qui y est logé.
 
 ### 9.2 Affecter un détenu à une cellule
 
 ```
 POST /detenus/{id}/affectations
 GET  /detenus/{id}/affectations   (historique du détenu)
-GET  /affectations                (fil global, paginé 20/page, plus récent d'abord)
+GET  /affectations                (fil global, paginé, plus récent d'abord)
 ```
 ```json
 { "cellule_id": 3, "motif_affectation": "Arrivée à l'établissement" }
@@ -441,7 +441,7 @@ Le type de sanction n'est **plus du texte libre** : c'est une petite table de r�
 ### 9.4 Sanctions
 
 ```
-GET    /sanctions                     (liste globale, paginée 10/page)
+GET    /sanctions                     (liste globale, paginée)
 GET    /detenus/{id}/sanctions        (toutes les sanctions d'un détenu)
 POST   /detenus/{id}/sanctions
 GET    /sanctions/{id}
@@ -453,7 +453,7 @@ POST   /sanctions/{id}/terminer
 
 `GET /sanctions` accepte deux filtres combinables : `?detenu_id=12` et `?est_actif=1` (ou `0`). Chaque ligne inclut `detenu` (`id`/`numero_ecrou`/`nom`), triée par `date_debut` décroissante.
 
-`GET /detenus/{id}/sanctions` retourne l'historique complet d'un détenu (actives et terminées), sans pagination — comme `GET /detenus/{id}/affectations`.
+`GET /detenus/{id}/sanctions` retourne l'historique d'un détenu (actives et terminées), paginé comme tous les listings (section 0) — comme `GET /detenus/{id}/affectations`.
 
 **Point important** : si `cellule_disciplinaire_id` est fourni à la création, le détenu est **réellement déplacé** dans cette cellule (nouvelle affectation créée, ancienne clôturée) — l'occupation des cellules reste toujours exacte. La cellule d'où il venait est mémorisée automatiquement (`cellule_origine` dans la réponse).
 
@@ -538,7 +538,7 @@ POST /detenus/{id}/sorties/evasion
 
 ```
 GET /detenus/{id}/sorties          (historique des sorties de CE détenu)
-GET /sorties                       (archive globale, tous détenus, paginée 20/page)
+GET /sorties                       (archive globale, tous détenus, paginée)
 GET /sorties?type_sortie=deces     (filtrée par type)
 ```
 Valeurs valides pour `type_sortie` : `liberation_normale`, `deces`, `transfert`, `evasion`. Valeur invalide → `422`.
@@ -558,7 +558,7 @@ Deux modules distincts côté données, mais avec la même forme d'API que les s
 ### 11.1 Suivi médical (consultations à l'infirmerie)
 
 ```
-GET  /suivis-medicaux                     (liste globale, non paginée, plus récente d'abord)
+GET  /suivis-medicaux                     (liste globale, paginée, plus récente d'abord)
 GET  /detenus/{id}/suivis-medicaux        (historique d'un détenu, pour l'onglet "Santé" du dossier)
 POST /detenus/{id}/suivis-medicaux
 ```
@@ -588,7 +588,7 @@ Détenu désactivé → `409`, même logique que pour une sanction (section 9.4)
 ### 11.2 Visites (parloir)
 
 ```
-GET  /visites                     (liste globale, non paginée, plus récente d'abord)
+GET  /visites                     (liste globale, paginée, plus récente d'abord)
 GET  /detenus/{id}/visites        (historique des visites reçues par un détenu)
 POST /detenus/{id}/visites
 ```
@@ -707,8 +707,9 @@ Réponse `200`, un seul objet (pas de pagination) :
 | `DELETE` | `/mandas/{id}` | Oui | Désactiver un mandat (soft) |
 | `GET` | `/cellules?page=N` | Oui | Liste paginée des cellules |
 | `POST` | `/cellules` | Oui | Créer une cellule |
-| `GET` | `/cellules/{id}` | Oui | Détail d'une cellule (+ occupants actuels) |
+| `GET` | `/cellules/{id}` | Oui | Détail d'une cellule |
 | `PUT` | `/cellules/{id}` | Oui | Modifier une cellule |
+| `GET` | `/cellules/{id}/detenus` | Oui | Détenus présents dans cette cellule, paginé (clic sur une cellule) |
 | `POST` | `/detenus/{id}/affectations` | Oui | Affecter le détenu à une cellule |
 | `GET` | `/detenus/{id}/affectations` | Oui | Historique des affectations du détenu |
 | `GET` | `/affectations` | Oui | Fil global des mouvements de cellule, paginé, plus récent d'abord |

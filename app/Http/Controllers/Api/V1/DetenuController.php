@@ -8,6 +8,7 @@ use App\Http\Requests\StoreDetenuRequest;
 use App\Http\Requests\UpdateDetenuRequest;
 use App\Http\Resources\DetenuListResource;
 use App\Http\Resources\DetenuResource;
+use App\Models\Cellule;
 use App\Models\Detenu;
 use App\Services\CloudinaryUploadService;
 use Illuminate\Http\Request;
@@ -16,8 +17,6 @@ use Illuminate\Validation\ValidationException;
 
 class DetenuController extends Controller
 {
-    private const PER_PAGE = 10;
-
     private const RELATIONS = [
         'createdBy', 'updatedBy', 'mandas', 'affectationActive.cellule',
         'sanctions.typeSanction', 'sanctions.celluleDisciplinaire', 'sanctions.celluleOrigine',
@@ -47,7 +46,23 @@ class DetenuController extends Controller
             $query->sansCellule();
         }
 
-        $detenus = $query->latest('id')->paginate(self::PER_PAGE);
+        $detenus = $query->latest('id')->paginate($this->perPage($request));
+
+        return DetenuListResource::collection($detenus);
+    }
+
+    /**
+     * Détenus actuellement logés dans une cellule précise - alimente l'écran qui
+     * s'ouvre en cliquant sur une cellule.
+     */
+    public function indexForCellule(Cellule $cellule, Request $request)
+    {
+        $detenus = Detenu::query()
+            ->where('est_present', true)
+            ->whereHas('affectationActive', fn ($q) => $q->where('cellule_id', $cellule->id))
+            ->with(['mandasActifs', 'affectationActive.cellule'])
+            ->orderBy('nom')
+            ->paginate($this->perPage($request));
 
         return DetenuListResource::collection($detenus);
     }

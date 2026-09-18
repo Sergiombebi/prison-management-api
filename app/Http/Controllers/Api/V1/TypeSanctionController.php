@@ -15,7 +15,7 @@ class TypeSanctionController extends Controller
     {
         $types = TypeSanction::query()
             ->orderBy('libelle')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return TypeSanctionResource::collection($types);
     }

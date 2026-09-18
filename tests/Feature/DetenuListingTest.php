@@ -190,4 +190,30 @@ class DetenuListingTest extends TestCase
         $response->assertJsonCount(1, 'data');
         $response->assertJsonPath('data.0.id', $sansCellule->id);
     }
+
+    public function test_per_page_est_toujours_borne_entre_1_et_10(): void
+    {
+        for ($i = 0; $i < 15; $i++) {
+            $detenu = $this->creerDetenu();
+            $this->creerMandas($detenu);
+        }
+
+        $defaut = $this->getJson('/api/v1/detenus');
+        $defaut->assertOk();
+        $defaut->assertJsonCount(10, 'data');
+        $defaut->assertJsonPath('meta.per_page', 10);
+
+        $reduit = $this->getJson('/api/v1/detenus?per_page=3');
+        $reduit->assertOk();
+        $reduit->assertJsonCount(3, 'data');
+
+        $auDela = $this->getJson('/api/v1/detenus?per_page=50');
+        $auDela->assertOk();
+        $auDela->assertJsonCount(10, 'data');
+        $auDela->assertJsonPath('meta.per_page', 10);
+
+        $sousLeMinimum = $this->getJson('/api/v1/detenus?per_page=0');
+        $sousLeMinimum->assertOk();
+        $sousLeMinimum->assertJsonCount(1, 'data');
+    }
 }

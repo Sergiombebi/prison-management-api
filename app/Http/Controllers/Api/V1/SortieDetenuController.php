@@ -30,12 +30,12 @@ class SortieDetenuController extends Controller
      * Historique des sorties d'un détenu précis (utile en cas de réincarcération :
      * on garde la trace des sorties précédentes).
      */
-    public function index(Detenu $detenu)
+    public function index(Detenu $detenu, Request $request)
     {
         $sorties = $detenu->sorties()
             ->with(self::RELATIONS)
             ->orderByDesc('date_sortie')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return SortieResource::collection($sorties);
     }
@@ -60,7 +60,7 @@ class SortieDetenuController extends Controller
             $query->where('type_sortie', $type);
         }
 
-        $sorties = $query->orderByDesc('date_sortie')->paginate(20);
+        $sorties = $query->orderByDesc('date_sortie')->paginate($this->perPage($request));
 
         return SortieResource::collection($sorties);
     }

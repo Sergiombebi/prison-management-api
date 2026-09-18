@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/cellules', [CelluleController::class, 'store']);
         Route::get('/cellules/{cellule}', [CelluleController::class, 'show']);
         Route::put('/cellules/{cellule}', [CelluleController::class, 'update']);
+        Route::get('/cellules/{cellule}/detenus', [DetenuController::class, 'indexForCellule']);
 
         Route::get('/affectations', [AffectationController::class, 'archive']);
         Route::get('/detenus/{detenu}/affectations', [AffectationController::class, 'index']);

@@ -113,4 +113,22 @@ class SuiviMedicalTest extends TestCase
         $parDetenu->assertOk();
         $parDetenu->assertJsonCount(1, 'data');
     }
+
+    public function test_les_listes_sont_paginees(): void
+    {
+        $detenu = $this->creerDetenu();
+        for ($i = 0; $i < 12; $i++) {
+            $this->postJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux", $this->corpsValide())->assertCreated();
+        }
+
+        $globale = $this->getJson('/api/v1/suivis-medicaux');
+        $globale->assertOk();
+        $globale->assertJsonCount(10, 'data');
+        $globale->assertJsonPath('meta.total', 12);
+
+        $parDetenu = $this->getJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux?per_page=5");
+        $parDetenu->assertOk();
+        $parDetenu->assertJsonCount(5, 'data');
+        $parDetenu->assertJsonPath('meta.total', 12);
+    }
 }

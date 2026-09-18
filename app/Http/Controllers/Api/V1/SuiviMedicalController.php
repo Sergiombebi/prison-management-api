@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSuiviMedicalRequest;
 use App\Http\Resources\SuiviMedicalResource;
 use App\Models\Detenu;
 use App\Models\SuiviMedical;
+use Illuminate\Http\Request;
 
 class SuiviMedicalController extends Controller
 {
@@ -15,13 +16,13 @@ class SuiviMedicalController extends Controller
     /**
      * Liste globale des consultations, tous détenus confondus, la plus récente d'abord.
      */
-    public function index()
+    public function index(Request $request)
     {
         $suivis = SuiviMedical::query()
             ->with([...self::RELATIONS, 'detenu'])
             ->orderByDesc('date_consultation')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return SuiviMedicalResource::collection($suivis);
     }
@@ -29,13 +30,13 @@ class SuiviMedicalController extends Controller
     /**
      * Historique médical complet d'un détenu précis (onglet "Santé" du dossier).
      */
-    public function indexForDetenu(Detenu $detenu)
+    public function indexForDetenu(Detenu $detenu, Request $request)
     {
         $suivis = $detenu->suivisMedicaux()
             ->with(self::RELATIONS)
             ->orderByDesc('date_consultation')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return SuiviMedicalResource::collection($suivis);
     }

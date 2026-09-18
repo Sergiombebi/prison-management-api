@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 class SanctionController extends Controller
 {
-    private const PER_PAGE = 10;
-
     private const RELATIONS = ['typeSanction', 'celluleDisciplinaire', 'celluleOrigine', 'affectationDisciplinaire', 'createdBy', 'updatedBy'];
 
     public function __construct(
@@ -40,7 +38,7 @@ class SanctionController extends Controller
             $query->where('est_actif', $request->boolean('est_actif'));
         }
 
-        $sanctions = $query->latest('date_debut')->paginate(self::PER_PAGE);
+        $sanctions = $query->latest('date_debut')->paginate($this->perPage($request));
 
         return SanctionResource::collection($sanctions);
     }
@@ -48,12 +46,12 @@ class SanctionController extends Controller
     /**
      * Toutes les sanctions d'un détenu précis (actives et passées).
      */
-    public function indexForDetenu(Detenu $detenu)
+    public function indexForDetenu(Detenu $detenu, Request $request)
     {
         $sanctions = $detenu->sanctions()
             ->with(self::RELATIONS)
             ->orderByDesc('date_debut')
-            ->get();
+            ->paginate($this->perPage($request));
 
         return SanctionResource::collection($sanctions);
     }

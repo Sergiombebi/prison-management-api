@@ -12,8 +12,6 @@ use Illuminate\Validation\ValidationException;
 
 class CelluleController extends Controller
 {
-    private const PER_PAGE = 10;
-
     private const RELATIONS = ['createdBy', 'updatedBy'];
 
     public function index(Request $request)
@@ -22,14 +20,14 @@ class CelluleController extends Controller
             ->with(self::RELATIONS)
             ->orderBy('bloc')
             ->orderBy('numero')
-            ->paginate(self::PER_PAGE);
+            ->paginate($this->perPage($request));
 
         return CelluleResource::collection($cellules);
     }
 
     public function show(Cellule $cellule)
     {
-        return new CelluleResource($cellule->load([...self::RELATIONS, 'affectationsActives.detenu']));
+        return new CelluleResource($cellule->load(self::RELATIONS));
     }
 
     public function store(StoreCelluleRequest $request)

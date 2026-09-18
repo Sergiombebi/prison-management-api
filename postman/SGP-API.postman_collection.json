@@ -991,6 +991,36 @@
           }
         },
         {
+          "name": "Détenus présents dans une cellule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cellules/{{cellule_id}}/detenus?per_page=5",
+              "host": ["{{base_url}}"],
+              "path": ["cellules", "{{cellule_id}}", "detenus"],
+              "query": [{ "key": "per_page", "value": "5" }]
+            },
+            "description": "Alimente l'écran qui s'ouvre en cliquant sur une cellule. Paginé comme tous les listings (1 à 10 par page via ?per_page=, 10 par défaut) - même forme que GET /detenus (categorie_penale, cellule_actuelle, statut_penal, ...), trié par nom."
+          }
+        },
+        {
           "name": "Affecter un détenu à une cellule",
           "event": [
             {
@@ -2246,7 +2276,7 @@
               "host": ["{{base_url}}"],
               "path": ["suivis-medicaux"]
             },
-            "description": "Liste globale, tous détenus confondus, non paginée (comme /detenus/{id}/sanctions) - la plus récente d'abord."
+            "description": "Liste globale, tous détenus confondus, paginée (1 à 10 par page via ?per_page=) - la plus récente d'abord."
           }
         },
         {
@@ -2372,7 +2402,7 @@
               "host": ["{{base_url}}"],
               "path": ["visites"]
             },
-            "description": "Liste globale, tous détenus confondus, non paginée - la plus récente d'abord."
+            "description": "Liste globale, tous détenus confondus, paginée (1 à 10 par page via ?per_page=) - la plus récente d'abord."
           }
         }
       ]
