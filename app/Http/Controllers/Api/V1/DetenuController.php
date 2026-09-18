@@ -115,6 +115,7 @@ class DetenuController extends Controller
     {
         $data = $request->validated();
 
+        $this->guardAgainstIdentityConflict('numero_ecrou', $data['numero_ecrou'] ?? null);
         $this->guardAgainstIdentityConflict('numero_cni', $data['numero_cni'] ?? null);
         $this->guardAgainstIdentityConflict('numero_passeport', $data['numero_passeport'] ?? null);
 
@@ -249,6 +250,10 @@ class DetenuController extends Controller
 
     private function fieldLabel(string $field): string
     {
-        return $field === 'numero_cni' ? 'numéro de CNI' : 'numéro de passeport';
+        return match ($field) {
+            'numero_ecrou' => "numéro d'écrou",
+            'numero_cni' => 'numéro de CNI',
+            default => 'numéro de passeport',
+        };
     }
 }

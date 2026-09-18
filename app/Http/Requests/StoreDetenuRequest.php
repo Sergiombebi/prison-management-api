@@ -17,7 +17,9 @@ class StoreDetenuRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'numero_ecrou' => ['required', 'string', 'max:50', 'unique:detenus,numero_ecrou'],
+            // Pas de règle "unique" ici non plus, pour la même raison que numero_cni /
+            // numero_passeport ci-dessous : géré à la main dans le contrôleur.
+            'numero_ecrou' => ['required', 'string', 'max:50'],
             'nom' => ['required', 'string', 'max:255'],
             'sexe' => ['required', 'in:Masculin,Féminin'],
             'date_naissance' => ['required', 'date', 'before:today'],
@@ -63,7 +65,6 @@ class StoreDetenuRequest extends FormRequest
     {
         return [
             'numero_ecrou.required' => "Le numéro d'écrou est obligatoire.",
-            'numero_ecrou.unique' => "Ce numéro d'écrou est déjà utilisé par un autre détenu.",
             'date_naissance.before' => 'La date de naissance doit être antérieure à aujourd\'hui.',
             'photo_face_url.required_with' => "Le public_id doit être accompagné de l'URL de la photo de face.",
             'photo_face_public_id.required_with' => "L'URL de la photo de face doit être accompagnée de son public_id (retournés ensemble par /detenus/photos).",
