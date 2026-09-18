@@ -31,6 +31,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/tableau-de-bord', [DashboardController::class, 'index'])
             ->middleware('permission:tableau_bord.consulter');
 
+        // Avant le groupe /detenus/{detenu} : sinon "verifier-identite" serait pris pour un identifiant.
+        Route::get('/detenus/verifier-identite', [DetenuController::class, 'verifierIdentite'])
+            ->middleware('permission:detenus.creer');
+
         Route::middleware('permission:detenus.consulter')->group(function () {
             Route::get('/detenus', [DetenuController::class, 'index']);
             Route::get('/detenus/{detenu}', [DetenuController::class, 'show']);

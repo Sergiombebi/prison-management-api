@@ -212,29 +212,56 @@ class DetenuController extends Controller
     }
 
     /**
-     * Si le CNI/passeport appartient déjà à un détenu actif, c'est un vrai doublon -> rejet.
+     * Vérifie à la volée si un numéro d'écrou/CNI/passeport est déjà pris, avant même
+     * d'avoir rempli le reste de la fiche (appelé au blur du champ côté frontend).
+     * Toujours 200 : ce n'est qu'une consultation, jamais un rejet.
+     */
+    public function verifierIdentite(Request $request)
+    {
+        $champs = ['numero_ecrou', 'numero_cni', 'numero_passeport'];
+
+        $data = $request->validate([
+            'champ' => ['required', 'string', 'in:'.implode(',', $champs)],
+            'valeur' => ['required', 'string', 'max:255'],
+        ]);
+
+        $conflit = $this->identiteConflictuelle($data['champ'], $data['valeur']);
+
+        if ($conflit === null) {
+            return response()->json(['disponible' => true]);
+        }
+
+        return response()->json(['disponible' => false, ...$conflit]);
+    }
+
+    /**
+     * Si le CNI/passeport/écrou appartient déjà à un détenu actif, c'est un vrai doublon.
      * S'il appartient à un détenu désactivé, on propose de le restaurer plutôt que
      * de bloquer sèchement (cas typique : réincarcération de la même personne).
+     *
+     * @return array{present: true, message: string}|array{present: false, conflict: array<string, mixed>}|null
      */
-    private function guardAgainstIdentityConflict(string $field, ?string $value): void
+    private function identiteConflictuelle(string $field, ?string $value): ?array
     {
         if ($value === null) {
-            return;
+            return null;
         }
 
         $existing = Detenu::query()->where($field, $value)->first();
 
         if (! $existing) {
-            return;
+            return null;
         }
 
         if ($existing->est_present) {
-            throw ValidationException::withMessages([
-                $field => ["Ce {$this->fieldLabel($field)} est déjà associé à un détenu actuellement présent."],
-            ]);
+            return [
+                'present' => true,
+                'message' => "Ce {$this->fieldLabel($field)} est déjà associé à un détenu actuellement présent.",
+            ];
         }
 
-        abort(response()->json([
+        return [
+            'present' => false,
             'message' => "Un détenu désactivé existe déjà avec ce {$this->fieldLabel($field)}. Vous pouvez restaurer son dossier (avec ses mandats) au lieu d'en créer un nouveau.",
             'conflict' => [
                 'field' => $field,
@@ -245,6 +272,24 @@ class DetenuController extends Controller
                 'est_present' => $existing->est_present,
                 'restore_url' => "/api/v1/detenus/{$existing->id}/restore",
             ],
+        ];
+    }
+
+    private function guardAgainstIdentityConflict(string $field, ?string $value): void
+    {
+        $conflit = $this->identiteConflictuelle($field, $value);
+
+        if ($conflit === null) {
+            return;
+        }
+
+        if ($conflit['present']) {
+            throw ValidationException::withMessages([$field => [$conflit['message']]]);
+        }
+
+        abort(response()->json([
+            'message' => $conflit['message'],
+            'conflict' => $conflit['conflict'],
         ], 409));
     }
 

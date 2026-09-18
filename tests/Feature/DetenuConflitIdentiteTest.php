@@ -90,4 +90,55 @@ class DetenuConflitIdentiteTest extends TestCase
         // Le détenu désactivé qui a le doublon ne doit pas être recréé.
         $this->assertDatabaseCount('detenus', 1);
     }
+
+    public function test_verification_a_la_volee_signale_une_valeur_disponible(): void
+    {
+        $response = $this->getJson('/api/v1/detenus/verifier-identite?champ=numero_ecrou&valeur=INEXISTANT');
+
+        $response->assertOk();
+        $response->assertExactJson(['disponible' => true]);
+    }
+
+    #[DataProvider('champsIdentiteProvider')]
+    public function test_verification_a_la_volee_signale_un_detenu_present(string $champ): void
+    {
+        $this->creerDetenu([$champ => 'DOUBLON-003', 'est_present' => true]);
+
+        $response = $this->getJson("/api/v1/detenus/verifier-identite?champ={$champ}&valeur=DOUBLON-003");
+
+        $response->assertOk();
+        $response->assertJsonPath('disponible', false);
+        $response->assertJsonPath('present', true);
+        $response->assertJsonMissingPath('conflict');
+    }
+
+    #[DataProvider('champsIdentiteProvider')]
+    public function test_verification_a_la_volee_propose_une_restauration(string $champ): void
+    {
+        $existant = $this->creerDetenu([$champ => 'DOUBLON-004', 'est_present' => false]);
+
+        $response = $this->getJson("/api/v1/detenus/verifier-identite?champ={$champ}&valeur=DOUBLON-004");
+
+        $response->assertOk();
+        $response->assertJsonPath('disponible', false);
+        $response->assertJsonPath('present', false);
+        $response->assertJsonPath('conflict.detenu_id', $existant->id);
+        $response->assertJsonPath('conflict.restore_url', "/api/v1/detenus/{$existant->id}/restore");
+    }
+
+    public function test_verification_a_la_volee_refuse_un_champ_inconnu(): void
+    {
+        $response = $this->getJson('/api/v1/detenus/verifier-identite?champ=nom&valeur=Dupont');
+
+        $response->assertStatus(422);
+    }
+
+    public function test_verification_a_la_volee_refusee_sans_la_permission_detenus_creer(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['permissions' => []]));
+
+        $response = $this->getJson('/api/v1/detenus/verifier-identite?champ=numero_ecrou&valeur=DOUBLON-003');
+
+        $response->assertStatus(403);
+    }
 }
