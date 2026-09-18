@@ -6,11 +6,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Fiche complète d'un compte (module Personnel) - distincte de UserResource, qui reste
- * volontairement minimale puisqu'elle sert de référence "créé/modifié par" un peu partout
- * dans l'API et n'a pas besoin de date de création ou de dernière connexion.
+ * Fiche du compte connecté - utilisée uniquement par POST /auth/login et GET /auth/me.
+ * Distincte de UserResource (référence minimale "créé/modifié par") : ici le frontend a
+ * besoin de ses propres permissions pour adapter la navigation et les actions visibles.
  */
-class UtilisateurResource extends JsonResource
+class ProfilResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -25,9 +25,7 @@ class UtilisateurResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role->value,
             'permissions' => $this->permissions ?? [],
-            'est_actif' => $this->est_actif,
-            'created_at' => $this->created_at,
-            'last_login_at' => $this->last_login_at,
+            'derniere_connexion' => $this->last_login_at,
         ];
     }
 }

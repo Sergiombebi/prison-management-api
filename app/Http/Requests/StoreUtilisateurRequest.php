@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Permission;
 use App\Enums\RoleUtilisateur;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -25,6 +26,10 @@ class StoreUtilisateurRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(array_column(RoleUtilisateur::cases(), 'value'))],
+            'permissions' => ['array'],
+            // On ne peut accorder que des permissions qui existent et qu'on détient déjà
+            // soi-même - sinon un titulaire d'une seule permission pourrait en distribuer d'autres.
+            'permissions.*' => [Rule::in(Permission::values()), Rule::in($this->user()?->permissions ?? [])],
         ];
     }
 
@@ -37,6 +42,7 @@ class StoreUtilisateurRequest extends FormRequest
             'username.unique' => "Ce nom d'utilisateur est déjà pris.",
             'email.unique' => 'Cet email est déjà associé à un compte.',
             'role.in' => 'Rôle invalide. Valeurs acceptées : '.implode(', ', array_column(RoleUtilisateur::cases(), 'value')).'.',
+            'permissions.*.in' => 'Vous ne pouvez accorder que des permissions que vous détenez vous-même.',
         ];
     }
 }

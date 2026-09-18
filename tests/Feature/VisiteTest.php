@@ -16,7 +16,7 @@ class VisiteTest extends TestCase
     {
         parent::setUp();
 
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->admin()->create());
     }
 
     private function creerDetenu(array $attributes = []): Detenu

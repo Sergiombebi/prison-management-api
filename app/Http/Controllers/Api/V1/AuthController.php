@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\ProfilResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -39,7 +39,7 @@ class AuthController extends Controller
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
-            'user' => new UserResource($user),
+            'user' => new ProfilResource($user),
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -47,7 +47,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return new UserResource($request->user());
+        return new ProfilResource($request->user());
     }
 
     public function logout(Request $request)

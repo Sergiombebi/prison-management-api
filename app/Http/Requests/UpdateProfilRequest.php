@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\Permission;
-use App\Enums\RoleUtilisateur;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateUtilisateurRequest extends FormRequest
+/**
+ * Modification de son propre profil - volontairement sans champ role ni permissions :
+ * leur absence ici, et non un filtrage a posteriori, est ce qui empêche un utilisateur
+ * de se les attribuer lui-même.
+ */
+class UpdateProfilRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -19,18 +22,13 @@ class UpdateUtilisateurRequest extends FormRequest
      */
     public function rules(): array
     {
-        $utilisateurId = $this->route('utilisateur')?->id;
+        $utilisateurId = $this->user()?->id;
 
         return [
             'nom' => ['required', 'string', 'max:255'],
             'prenom' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', Rule::unique('users', 'username')->ignore($utilisateurId)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($utilisateurId)],
-            'role' => ['required', Rule::in(array_column(RoleUtilisateur::cases(), 'value'))],
-            'permissions' => ['array'],
-            // On ne peut accorder (ou garder, y compris sur son propre compte) que des
-            // permissions qu'on détient déjà soi-même.
-            'permissions.*' => [Rule::in(Permission::values()), Rule::in($this->user()?->permissions ?? [])],
         ];
     }
 
@@ -42,8 +40,6 @@ class UpdateUtilisateurRequest extends FormRequest
         return [
             'username.unique' => "Ce nom d'utilisateur est déjà pris.",
             'email.unique' => 'Cet email est déjà associé à un compte.',
-            'role.in' => 'Rôle invalide. Valeurs acceptées : '.implode(', ', array_column(RoleUtilisateur::cases(), 'value')).'.',
-            'permissions.*.in' => 'Vous ne pouvez accorder que des permissions que vous détenez vous-même.',
         ];
     }
 }

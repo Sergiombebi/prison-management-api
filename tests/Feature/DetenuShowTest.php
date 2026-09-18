@@ -22,7 +22,7 @@ class DetenuShowTest extends TestCase
     {
         parent::setUp();
 
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->admin()->create());
     }
 
     public function test_la_fiche_detenu_expose_sa_cellule_actuelle(): void

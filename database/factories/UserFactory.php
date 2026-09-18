@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Permission;
 use App\Enums\RoleUtilisateur;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -31,17 +32,20 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
             'role' => RoleUtilisateur::Agent,
+            'permissions' => [],
             'est_actif' => true,
         ];
     }
 
     /**
-     * Indicate that the user is an administrator.
+     * Indicate that the user is an administrator with every permission - à l'image du
+     * compte administrateur initial, seul à démarrer avec tous les droits.
      */
     public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
             'role' => RoleUtilisateur::Admin,
+            'permissions' => Permission::values(),
         ]);
     }
 
