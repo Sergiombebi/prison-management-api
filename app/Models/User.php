@@ -27,6 +27,7 @@ class User extends Authenticatable
         'password',
         'role',
         'est_actif',
+        'last_login_at',
     ];
 
     /**
@@ -50,6 +51,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => RoleUtilisateur::class,
             'est_actif' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 }

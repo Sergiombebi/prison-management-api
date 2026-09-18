@@ -7,10 +7,13 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
 use App\Http\Controllers\Api\V1\MandasController;
+use App\Http\Controllers\Api\V1\ParametreController;
+use App\Http\Controllers\Api\V1\ParametreLogoController;
 use App\Http\Controllers\Api\V1\SanctionController;
 use App\Http\Controllers\Api\V1\SortieDetenuController;
 use App\Http\Controllers\Api\V1\SuiviMedicalController;
 use App\Http\Controllers\Api\V1\TypeSanctionController;
+use App\Http\Controllers\Api\V1\UtilisateurController;
 use App\Http\Controllers\Api\V1\VisiteController;
 use Illuminate\Support\Facades\Route;
 
@@ -73,5 +76,19 @@ Route::prefix('v1')->group(function () {
         Route::post('/detenus/{detenu}/visites', [VisiteController::class, 'store']);
 
         Route::get('/tableau-de-bord', [DashboardController::class, 'index']);
+
+        Route::get('/parametres', [ParametreController::class, 'show']);
+
+        Route::middleware('admin')->group(function () {
+            Route::get('/utilisateurs', [UtilisateurController::class, 'index']);
+            Route::post('/utilisateurs', [UtilisateurController::class, 'store']);
+            Route::put('/utilisateurs/{utilisateur}', [UtilisateurController::class, 'update']);
+            Route::post('/utilisateurs/{utilisateur}/desactiver', [UtilisateurController::class, 'desactiver']);
+            Route::post('/utilisateurs/{utilisateur}/restaurer', [UtilisateurController::class, 'restaurer']);
+            Route::post('/utilisateurs/{utilisateur}/reinitialiser-mot-de-passe', [UtilisateurController::class, 'reinitialiserMotDePasse']);
+
+            Route::put('/parametres', [ParametreController::class, 'update']);
+            Route::post('/parametres/logo', [ParametreLogoController::class, 'store']);
+        });
     });
 });
