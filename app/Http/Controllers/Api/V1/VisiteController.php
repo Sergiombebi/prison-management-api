@@ -41,6 +41,14 @@ class VisiteController extends Controller
         return VisiteResource::collection($visites);
     }
 
+    /**
+     * Détail d'une visite : mêmes champs que le listing, pour un ticket ou une fiche.
+     */
+    public function show(Visite $visite)
+    {
+        return new VisiteResource($visite->load([...self::RELATIONS, 'detenu']));
+    }
+
     public function store(StoreVisiteRequest $request, Detenu $detenu)
     {
         if (! $detenu->est_present) {

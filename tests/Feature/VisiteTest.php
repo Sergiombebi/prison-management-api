@@ -130,4 +130,26 @@ class VisiteTest extends TestCase
         $parDetenu->assertOk();
         $parDetenu->assertJsonCount(1, 'data');
     }
+
+    public function test_detail_dune_visite(): void
+    {
+        $detenu = $this->creerDetenu();
+        $creation = $this->postJson("/api/v1/detenus/{$detenu->id}/visites", $this->corpsValide());
+        $visiteId = $creation->json('data.id');
+
+        $response = $this->getJson("/api/v1/visites/{$visiteId}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.id', $visiteId);
+        $response->assertJsonPath('data.detenu_id', $detenu->id);
+        $response->assertJsonPath('data.detenu.nom', $detenu->nom);
+        $response->assertJsonPath('data.nom_visiteur', 'Alice Dupont');
+    }
+
+    public function test_detail_dune_visite_inexistante(): void
+    {
+        $response = $this->getJson('/api/v1/visites/999999');
+
+        $response->assertNotFound();
+    }
 }

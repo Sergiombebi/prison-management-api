@@ -102,6 +102,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:visites.consulter')->group(function () {
             Route::get('/visites', [VisiteController::class, 'index']);
             Route::get('/detenus/{detenu}/visites', [VisiteController::class, 'indexForDetenu']);
+            Route::get('/visites/{visite}', [VisiteController::class, 'show']);
         });
         Route::post('/detenus/{detenu}/visites', [VisiteController::class, 'store'])->middleware('permission:visites.creer');
 
