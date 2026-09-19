@@ -23,6 +23,11 @@ class SortieResource extends JsonResource
                 'lieu_naissance' => $this->detenu->lieu_naissance,
                 'nom_pere' => $this->detenu->nom_pere,
                 'nom_mere' => $this->detenu->nom_mere,
+                'profession' => $this->detenu->profession,
+                'nationalite' => $this->detenu->nationalite,
+                'anthropometrie' => $this->detenu->anthropometrie,
+                'photo_face_url' => $this->detenu->photo_face_url,
+                'photo_profil_url' => $this->detenu->photo_profil_url,
             ]),
 
             'mandas_id' => $this->mandas_id,
