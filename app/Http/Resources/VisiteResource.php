@@ -19,6 +19,14 @@ class VisiteResource extends JsonResource
                 'id' => $this->detenu->id,
                 'numero_ecrou' => $this->detenu->numero_ecrou,
                 'nom' => $this->detenu->nom,
+                'cellule' => $this->when(
+                    $this->detenu->relationLoaded('affectationActive'),
+                    fn () => $this->detenu->affectationActive?->cellule ? [
+                        'id' => $this->detenu->affectationActive->cellule->id,
+                        'numero' => $this->detenu->affectationActive->cellule->numero,
+                        'bloc' => $this->detenu->affectationActive->cellule->bloc,
+                    ] : null,
+                ),
             ]),
 
             'date_visite' => $this->date_visite?->toDateString(),

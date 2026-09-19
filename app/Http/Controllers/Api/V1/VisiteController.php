@@ -19,7 +19,7 @@ class VisiteController extends Controller
     public function index()
     {
         $visites = Visite::query()
-            ->with([...self::RELATIONS, 'detenu'])
+            ->with([...self::RELATIONS, 'detenu.affectationActive.cellule'])
             ->orderByDesc('date_visite')
             ->orderByDesc('id')
             ->get();
@@ -46,7 +46,7 @@ class VisiteController extends Controller
      */
     public function show(Visite $visite)
     {
-        return new VisiteResource($visite->load([...self::RELATIONS, 'detenu']));
+        return new VisiteResource($visite->load([...self::RELATIONS, 'detenu.affectationActive.cellule']));
     }
 
     public function store(StoreVisiteRequest $request, Detenu $detenu)
