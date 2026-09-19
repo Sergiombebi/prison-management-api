@@ -19,6 +19,10 @@ class SortieResource extends JsonResource
                 'id' => $this->detenu->id,
                 'numero_ecrou' => $this->detenu->numero_ecrou,
                 'nom' => $this->detenu->nom,
+                'date_naissance' => $this->detenu->date_naissance?->toDateString(),
+                'lieu_naissance' => $this->detenu->lieu_naissance,
+                'nom_pere' => $this->detenu->nom_pere,
+                'nom_mere' => $this->detenu->nom_mere,
             ]),
 
             'mandas_id' => $this->mandas_id,

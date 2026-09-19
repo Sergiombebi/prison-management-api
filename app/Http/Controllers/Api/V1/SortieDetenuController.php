@@ -8,6 +8,7 @@ use App\Http\Requests\StoreDecesRequest;
 use App\Http\Requests\StoreEvasionRequest;
 use App\Http\Requests\StoreLiberationNormaleRequest;
 use App\Http\Requests\StoreTransfertRequest;
+use App\Http\Requests\UpdateTransfertRequest;
 use App\Http\Resources\SortieResource;
 use App\Models\Detenu;
 use App\Models\Mandas;
@@ -63,6 +64,35 @@ class SortieDetenuController extends Controller
         $sorties = $query->orderByDesc('date_sortie')->paginate($this->perPage($request));
 
         return SortieResource::collection($sorties);
+    }
+
+    /**
+     * Détail d'une sortie, avec l'état civil du détenu (bulletin de transfèrement, fiches).
+     */
+    public function show(SortieDetenu $sortie)
+    {
+        return new SortieResource($sortie->load([...self::RELATIONS, 'detenu']));
+    }
+
+    /**
+     * Correction d'un transfert déjà consigné (destination, date, motif, observation).
+     * Les effets de la sortie sur le dossier (détenu non présent, mandats clos) restent
+     * acquis : seule la trace administrative du transfert est modifiable.
+     */
+    public function updateTransfert(UpdateTransfertRequest $request, SortieDetenu $sortie)
+    {
+        if ($sortie->type_sortie !== TypeSortieDetenu::Transfert) {
+            abort(response()->json([
+                'message' => 'Seul un transfert peut être modifié.',
+            ], 422));
+        }
+
+        $data = $request->validated();
+        $data['updated_by'] = $request->user()->id;
+
+        $sortie->update($data);
+
+        return new SortieResource($sortie->fresh([...self::RELATIONS, 'detenu']));
     }
 
     public function liberationNormale(StoreLiberationNormaleRequest $request, Detenu $detenu)

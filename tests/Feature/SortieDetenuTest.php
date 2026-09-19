@@ -294,4 +294,47 @@ class SortieDetenuTest extends TestCase
         $invalide = $this->getJson('/api/v1/sorties?type_sortie=inconnu');
         $invalide->assertStatus(422);
     }
+    public function test_detail_et_modification_dun_transfert(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu);
+        $creation = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/transfert", [
+            'date_sortie' => '2026-09-16',
+            'destination' => 'Prison de Douala',
+        ]);
+        $id = $creation->json('data.id');
+
+        $detail = $this->getJson("/api/v1/sorties/{$id}");
+        $detail->assertOk();
+        $detail->assertJsonPath('data.detenu.nom', 'Jean Dupont');
+        $detail->assertJsonPath('data.detenu.lieu_naissance', 'Douala');
+        $detail->assertJsonPath('data.detenu.nom_pere', 'Pierre Dupont');
+
+        $sansDestination = $this->putJson("/api/v1/sorties/{$id}", ['date_sortie' => '2026-09-17']);
+        $sansDestination->assertStatus(422);
+        $sansDestination->assertJsonValidationErrors('destination');
+
+        $maj = $this->putJson("/api/v1/sorties/{$id}", [
+            'date_sortie' => '2026-09-17',
+            'destination' => 'Prison Centrale de Bafoussam',
+            'motif' => 'Désengorgement',
+        ]);
+        $maj->assertOk();
+        $maj->assertJsonPath('data.destination', 'Prison Centrale de Bafoussam');
+        $maj->assertJsonPath('data.date_sortie', '2026-09-17');
+        $this->assertFalse($detenu->fresh()->est_present);
+    }
+
+    public function test_seul_un_transfert_est_modifiable(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu);
+        $id = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", ['date_sortie' => '2026-09-16'])
+            ->json('data.id');
+
+        $this->putJson("/api/v1/sorties/{$id}", [
+            'date_sortie' => '2026-09-17',
+            'destination' => 'Ailleurs',
+        ])->assertStatus(422);
+    }
 }

@@ -86,6 +86,8 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('permission:detenus.sorties.enregistrer')->group(function () {
             Route::get('/sorties', [SortieDetenuController::class, 'archive']);
+            Route::get('/sorties/{sortie}', [SortieDetenuController::class, 'show']);
+            Route::put('/sorties/{sortie}', [SortieDetenuController::class, 'updateTransfert']);
             Route::get('/detenus/{detenu}/sorties', [SortieDetenuController::class, 'index']);
             Route::post('/detenus/{detenu}/sorties/liberation-normale', [SortieDetenuController::class, 'liberationNormale']);
             Route::post('/detenus/{detenu}/sorties/deces', [SortieDetenuController::class, 'deces']);
