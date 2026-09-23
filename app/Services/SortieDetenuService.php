@@ -7,11 +7,20 @@ use App\Models\Detenu;
 use App\Models\Mandas;
 use App\Models\Sanction;
 use App\Models\SortieDetenu;
+use App\Models\SortieMandatGele;
+use App\Models\TypeSanction;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class SortieDetenuService
 {
+    public function __construct(
+        private readonly CelluleAssignmentService $assignment,
+    ) {
+    }
+
     /**
      * Enregistre une sortie "définitive" (décès, évasion, transfert) : le détenu quitte
      * physiquement l'établissement quel que soit le nombre de mandats en cours - tous
@@ -43,6 +52,13 @@ class SortieDetenuService
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
+
+            // Avant de clôturer ses mandats (ci-dessous) : le temps passé en cavale ne
+            // compte pas comme purgé, il faut donc savoir combien de jours il restait à
+            // chacun pour pouvoir les reporter si le détenu est repris (voir réintégrer()).
+            if ($type === TypeSortieDetenu::Evasion) {
+                $this->gelerMandatsActifs($detenu, $sortie, $data['date_sortie']);
+            }
 
             $this->cloturerDossierComplet($detenu, $userId);
 
@@ -90,6 +106,115 @@ class SortieDetenuService
             }
 
             return $sortie;
+        });
+    }
+
+    /**
+     * Réintègre un détenu évadé et repris : ses mandats gelés à l'évasion rouvrent avec
+     * leur reliquat reporté depuis la date de reprise (jamais l'ancienne échéance, qui
+     * aurait continué à courir pendant la cavale), et il est placé en cellule
+     * disciplinaire via une sanction — c'est, dans cette application, le seul mécanisme
+     * qui déplace réellement un détenu vers une cellule disciplinaire.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function reintegrerApresEvasion(SortieDetenu $sortie, array $data, int $userId): SortieDetenu
+    {
+        if ($sortie->type_sortie !== TypeSortieDetenu::Evasion) {
+            throw new InvalidArgumentException('Seule une évasion peut être réintégrée.');
+        }
+
+        if ($sortie->date_reintegration !== null) {
+            throw ValidationException::withMessages([
+                'date_reintegration' => ['Ce détenu a déjà été réintégré.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($sortie, $data, $userId) {
+            $detenu = $sortie->detenu()->lockForUpdate()->first();
+
+            $detenu->update([
+                'est_present' => true,
+                'updated_by' => $userId,
+            ]);
+
+            $sortie->mandatsGeles()->get()->each(function (SortieMandatGele $gel) use ($data, $userId) {
+                $mandat = Mandas::find($gel->mandat_id);
+                if (! $mandat) {
+                    return;
+                }
+
+                $mandat->update([
+                    'est_actif' => true,
+                    'date_expiration_mandat' => $gel->jours_restants !== null
+                        ? Carbon::parse($data['date_reintegration'])->addDays($gel->jours_restants)
+                        : $mandat->date_expiration_mandat,
+                    'updated_by' => $userId,
+                ]);
+            });
+
+            $typeSanction = TypeSanction::firstOrCreate(
+                ['libelle' => 'Évasion'],
+                ['est_actif' => true, 'created_by' => $userId, 'updated_by' => $userId],
+            );
+
+            $affectation = $this->assignment->assigner(
+                detenu: $detenu,
+                celluleId: $data['cellule_disciplinaire_id'],
+                date: $data['date_reintegration'],
+                motif: 'Réintégration après évasion',
+                userId: $userId,
+            );
+
+            Sanction::create([
+                'detenu_id' => $detenu->id,
+                'type_sanction_id' => $typeSanction->id,
+                'motif' => 'Évasion : réintégration après cavale',
+                'date_faute' => $sortie->date_sortie,
+                'date_debut' => $data['date_reintegration'],
+                'date_fin' => null,
+                'cellule_disciplinaire_id' => $data['cellule_disciplinaire_id'],
+                'cellule_origine_id' => null,
+                'affectation_disciplinaire_id' => $affectation->id,
+                'est_actif' => true,
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ]);
+
+            $sortie->update([
+                'date_reintegration' => $data['date_reintegration'],
+                'lieu_reintegration' => $data['lieu_reintegration'] ?? null,
+                'autorite_reintegration' => $data['autorite_reintegration'] ?? null,
+                'observations_reintegration' => $data['observations_reintegration'] ?? null,
+                'updated_by' => $userId,
+            ]);
+
+            return $sortie->fresh();
+        });
+    }
+
+    /**
+     * Photographie les mandats actifs du détenu au moment de son évasion : pour chacun,
+     * le nombre de jours qu'il lui restait à purger (nul si le mandat n'a pas d'échéance).
+     * Un mandat déjà échu à cet instant repart de zéro plutôt que d'une date passée.
+     */
+    private function gelerMandatsActifs(Detenu $detenu, SortieDetenu $sortie, string $dateSortie): void
+    {
+        $date = Carbon::parse($dateSortie)->startOfDay();
+
+        $detenu->mandas()->where('est_actif', true)->get()->each(function (Mandas $mandat) use ($sortie, $date) {
+            $joursRestants = null;
+
+            if ($mandat->date_expiration_mandat) {
+                $expiration = $mandat->date_expiration_mandat->copy()->startOfDay();
+                $joursRestants = $expiration->greaterThan($date) ? $date->diffInDays($expiration) : 0;
+            }
+
+            SortieMandatGele::create([
+                'sortie_id' => $sortie->id,
+                'mandat_id' => $mandat->id,
+                'jours_restants' => $joursRestants,
+            ]);
         });
     }
 

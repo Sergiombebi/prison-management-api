@@ -6,6 +6,7 @@ use App\Enums\TypeSortieDetenu;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SortieDetenu extends Model
 {
@@ -22,6 +23,10 @@ class SortieDetenu extends Model
         'destination',
         'cause',
         'observation',
+        'date_reintegration',
+        'lieu_reintegration',
+        'autorite_reintegration',
+        'observations_reintegration',
         'sortie_definitive',
         'created_by',
         'updated_by',
@@ -35,6 +40,7 @@ class SortieDetenu extends Model
         return [
             'type_sortie' => TypeSortieDetenu::class,
             'date_sortie' => 'date',
+            'date_reintegration' => 'date',
             'sortie_definitive' => 'boolean',
         ];
     }
@@ -47,6 +53,11 @@ class SortieDetenu extends Model
     public function mandas(): BelongsTo
     {
         return $this->belongsTo(Mandas::class);
+    }
+
+    public function mandatsGeles(): HasMany
+    {
+        return $this->hasMany(SortieMandatGele::class, 'sortie_id');
     }
 
     public function createdBy(): BelongsTo

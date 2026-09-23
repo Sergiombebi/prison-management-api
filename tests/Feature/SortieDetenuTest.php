@@ -337,4 +337,140 @@ class SortieDetenuTest extends TestCase
             'destination' => 'Ailleurs',
         ])->assertStatus(422);
     }
+
+    public function test_reintegration_dun_evade_reporte_le_reliquat_de_peine_et_place_en_cellule_disciplinaire(): void
+    {
+        $detenu = $this->creerDetenu();
+        // Il restait 10 jours à purger au moment de l'évasion (16 au 26 septembre)
+        $mandas = $this->creerMandas($detenu, ['date_expiration_mandat' => '2026-09-26']);
+        $celluleOrigine = $this->creerCellule();
+        $this->affecterCellule($detenu, $celluleOrigine);
+
+        $evasion = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", [
+            'date_sortie' => '2026-09-16',
+        ]);
+        $evasion->assertCreated();
+        $sortieId = $evasion->json('data.id');
+
+        $this->assertFalse($detenu->fresh()->est_present);
+        $this->assertFalse($mandas->fresh()->est_actif);
+
+        $celluleDisciplinaire = $this->creerCellule();
+
+        $reintegration = $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'lieu_reintegration' => 'Contrôle routier, Mfoundi',
+            'autorite_reintegration' => 'Gendarmerie de Yaoundé',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ]);
+
+        $reintegration->assertOk();
+        $reintegration->assertJsonPath('data.date_reintegration', '2026-09-30');
+        $reintegration->assertJsonPath('data.lieu_reintegration', 'Contrôle routier, Mfoundi');
+
+        $detenu->refresh();
+        $this->assertTrue($detenu->est_present);
+
+        // 10 jours restants au moment de l'évasion, reportés depuis le 30 septembre
+        $mandas->refresh();
+        $this->assertTrue($mandas->est_actif);
+        $this->assertSame('2026-10-10', $mandas->date_expiration_mandat->toDateString());
+
+        // Placé en cellule disciplinaire via une sanction, pas dans son ancienne cellule
+        $affectation = $detenu->affectations()->whereNull('date_fin')->first();
+        $this->assertNotNull($affectation);
+        $this->assertSame($celluleDisciplinaire->id, $affectation->cellule_id);
+
+        $sanction = $detenu->sanctions()->where('est_actif', true)->first();
+        $this->assertNotNull($sanction);
+        $this->assertSame($celluleDisciplinaire->id, $sanction->cellule_disciplinaire_id);
+        $this->assertSame('Évasion', $sanction->typeSanction->libelle);
+    }
+
+    public function test_mandat_sans_echeance_rouvre_tel_quel_a_la_reintegration(): void
+    {
+        $detenu = $this->creerDetenu();
+        $mandas = $this->creerMandas($detenu); // sans date_expiration_mandat
+
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", ['date_sortie' => '2026-09-16'])
+            ->json('data.id');
+
+        $celluleDisciplinaire = $this->creerCellule();
+        $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ])->assertOk();
+
+        $mandas->refresh();
+        $this->assertTrue($mandas->est_actif);
+        $this->assertNull($mandas->date_expiration_mandat);
+    }
+
+    public function test_mandat_deja_echu_avant_levasion_repart_de_zero(): void
+    {
+        $detenu = $this->creerDetenu();
+        $mandas = $this->creerMandas($detenu, ['date_expiration_mandat' => '2026-09-10']);
+
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", ['date_sortie' => '2026-09-16'])
+            ->json('data.id');
+
+        $celluleDisciplinaire = $this->creerCellule();
+        $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ])->assertOk();
+
+        $mandas->refresh();
+        $this->assertSame('2026-09-30', $mandas->date_expiration_mandat->toDateString());
+    }
+
+    public function test_impossible_de_reintegrer_deux_fois(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu);
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", ['date_sortie' => '2026-09-16'])
+            ->json('data.id');
+        $celluleDisciplinaire = $this->creerCellule();
+
+        $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ])->assertOk();
+
+        $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-10-01',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ])->assertStatus(422);
+    }
+
+    public function test_impossible_de_reintegrer_une_sortie_qui_nest_pas_une_evasion(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu);
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/transfert", [
+            'date_sortie' => '2026-09-16',
+            'destination' => 'Ailleurs',
+        ])->json('data.id');
+        $celluleDisciplinaire = $this->creerCellule();
+
+        $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ])->assertStatus(422);
+    }
+
+    public function test_reintegration_requiert_une_cellule_disciplinaire(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu);
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", ['date_sortie' => '2026-09-16'])
+            ->json('data.id');
+
+        $response = $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('cellule_disciplinaire_id');
+    }
 }

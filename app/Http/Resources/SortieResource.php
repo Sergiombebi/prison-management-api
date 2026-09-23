@@ -48,6 +48,11 @@ class SortieResource extends JsonResource
             // ou juste clos un mandat parmi d'autres (libération normale en DPAC) ?
             'sortie_definitive' => $this->sortie_definitive,
 
+            'date_reintegration' => $this->date_reintegration?->toDateString(),
+            'lieu_reintegration' => $this->lieu_reintegration,
+            'autorite_reintegration' => $this->autorite_reintegration,
+            'observations_reintegration' => $this->observations_reintegration,
+
             'created_by' => new UserResource($this->whenLoaded('createdBy')),
             'updated_by' => new UserResource($this->whenLoaded('updatedBy')),
             'created_at' => $this->created_at,

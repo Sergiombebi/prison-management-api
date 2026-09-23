@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDecesRequest;
 use App\Http\Requests\StoreEvasionRequest;
 use App\Http\Requests\StoreLiberationNormaleRequest;
+use App\Http\Requests\ReintegrerEvasionRequest;
 use App\Http\Requests\StoreTransfertRequest;
 use App\Http\Requests\UpdateTransfertRequest;
 use App\Http\Resources\SortieResource;
@@ -122,6 +123,22 @@ class SortieDetenuController extends Controller
     public function evasion(StoreEvasionRequest $request, Detenu $detenu)
     {
         return $this->creerSortieDefinitive($request, $detenu, TypeSortieDetenu::Evasion);
+    }
+
+    /**
+     * Réintègre un détenu évadé et repris : voir SortieDetenuService::reintegrerApresEvasion().
+     */
+    public function reintegrer(ReintegrerEvasionRequest $request, SortieDetenu $sortie)
+    {
+        if ($sortie->type_sortie !== TypeSortieDetenu::Evasion) {
+            abort(response()->json([
+                'message' => 'Seule une évasion peut être réintégrée.',
+            ], 422));
+        }
+
+        $sortie = $this->sorties->reintegrerApresEvasion($sortie, $request->validated(), $request->user()->id);
+
+        return new SortieResource($sortie->load(self::RELATIONS));
     }
 
     private function creerSortieDefinitive(FormRequest $request, Detenu $detenu, TypeSortieDetenu $type)
