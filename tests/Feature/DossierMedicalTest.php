@@ -73,4 +73,35 @@ class DossierMedicalTest extends TestCase
         $response->assertOk();
         $this->assertNull($detenu->fresh()->allergies);
     }
+
+    public function test_consultation_du_dossier_medical(): void
+    {
+        $detenu = $this->creerDetenu(['groupe_sanguin' => 'O+', 'allergies' => 'Pénicilline']);
+
+        $response = $this->getJson("/api/v1/detenus/{$detenu->id}/dossier-medical");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.nom', 'Jean Dupont');
+        $response->assertJsonPath('data.groupe_sanguin', 'O+');
+        $response->assertJsonPath('data.allergies', 'Pénicilline');
+    }
+
+    /**
+     * Le cœur du correctif : un compte qui n'a que les droits du module Suivi médical,
+     * sans `detenus.consulter`, doit quand même pouvoir consulter le dossier médical de
+     * ses patients — alors que la fiche complète du détenu, elle, lui reste fermée.
+     */
+    public function test_consultable_sans_le_droit_sur_le_module_detenus(): void
+    {
+        $medecin = User::factory()->create(['permissions' => ['sante.consultations.consulter']]);
+        $detenu = $this->creerDetenu();
+
+        Sanctum::actingAs($medecin);
+
+        $dossierMedical = $this->getJson("/api/v1/detenus/{$detenu->id}/dossier-medical");
+        $dossierMedical->assertOk();
+
+        $ficheComplete = $this->getJson("/api/v1/detenus/{$detenu->id}");
+        $ficheComplete->assertForbidden();
+    }
 }

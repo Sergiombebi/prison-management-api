@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateDetenuRequest;
 use App\Http\Requests\UpdateDossierMedicalRequest;
 use App\Http\Resources\DetenuListResource;
 use App\Http\Resources\DetenuResource;
+use App\Http\Resources\DossierMedicalResource;
 use App\Models\Cellule;
 use App\Models\Detenu;
 use App\Services\CloudinaryUploadService;
@@ -167,6 +168,18 @@ class DetenuController extends Controller
         $detenu->update($data);
 
         return new DetenuResource($detenu->fresh(self::RELATIONS));
+    }
+
+    /**
+     * Dossier médical seul (identité, résumé pénal, état de santé) : accessible avec
+     * la seule permission `sante.consultations.consulter`, sans passer par le module
+     * Détenus. Voir DossierMedicalResource.
+     */
+    public function dossierMedical(Detenu $detenu)
+    {
+        return new DossierMedicalResource(
+            $detenu->load(['mandasActifs', 'affectationActive.cellule', 'evacuationActive'])
+        );
     }
 
     public function destroy(Request $request, Detenu $detenu)

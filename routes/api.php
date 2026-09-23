@@ -101,6 +101,9 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:sante.consultations.consulter')->group(function () {
             Route::get('/suivis-medicaux', [SuiviMedicalController::class, 'index']);
             Route::get('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'indexForDetenu']);
+            // Accessible sans `detenus.consulter` : un médecin doit pouvoir consulter le
+            // dossier médical de ses patients même sans droit sur le module Détenus.
+            Route::get('/detenus/{detenu}/dossier-medical', [DetenuController::class, 'dossierMedical']);
         });
         Route::post('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'store'])->middleware('permission:sante.consultations.creer');
 
