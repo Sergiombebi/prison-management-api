@@ -22,7 +22,7 @@ class DetenuController extends Controller
     private const RELATIONS = [
         'createdBy', 'updatedBy', 'mandas', 'affectationActive.cellule',
         'sanctions.typeSanction', 'sanctions.celluleDisciplinaire', 'sanctions.celluleOrigine',
-        'suivisMedicaux', 'visites', 'evacuationActive',
+        'suivisMedicaux', 'visites', 'evacuationActive', 'prescriptionsActives', 'prescriptions',
     ];
 
     public function __construct(
@@ -178,7 +178,7 @@ class DetenuController extends Controller
     public function dossierMedical(Detenu $detenu)
     {
         return new DossierMedicalResource(
-            $detenu->load(['mandasActifs', 'affectationActive.cellule', 'evacuationActive'])
+            $detenu->load(['mandasActifs', 'affectationActive.cellule', 'evacuationActive', 'prescriptionsActives', 'prescriptions'])
         );
     }
 

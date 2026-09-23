@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\EvacuationSanitaireController;
 use App\Http\Controllers\Api\V1\MandasController;
 use App\Http\Controllers\Api\V1\ParametreController;
 use App\Http\Controllers\Api\V1\ParametreLogoController;
+use App\Http\Controllers\Api\V1\PrescriptionController;
 use App\Http\Controllers\Api\V1\ProfilController;
 use App\Http\Controllers\Api\V1\SanctionController;
 use App\Http\Controllers\Api\V1\SortieDetenuController;
@@ -113,6 +114,13 @@ Route::prefix('v1')->group(function () {
         });
         Route::post('/detenus/{detenu}/evacuations', [EvacuationSanitaireController::class, 'store'])->middleware('permission:sante.evacuations.creer');
         Route::post('/evacuations/{evacuation}/retour', [EvacuationSanitaireController::class, 'retour'])->middleware('permission:sante.evacuations.creer');
+
+        Route::middleware('permission:sante.traitements.consulter')->group(function () {
+            Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+            Route::get('/detenus/{detenu}/prescriptions', [PrescriptionController::class, 'indexForDetenu']);
+        });
+        Route::post('/detenus/{detenu}/prescriptions', [PrescriptionController::class, 'store'])->middleware('permission:sante.traitements.creer');
+        Route::post('/prescriptions/{prescription}/arreter', [PrescriptionController::class, 'arreter'])->middleware('permission:sante.traitements.creer');
 
         Route::middleware('permission:visites.consulter')->group(function () {
             Route::get('/visites', [VisiteController::class, 'index']);

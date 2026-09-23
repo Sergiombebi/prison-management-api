@@ -42,7 +42,6 @@ class DossierMedicalTest extends TestCase
             'groupe_sanguin' => 'O+',
             'allergies' => 'Pénicilline',
             'maladies_chroniques' => 'Asthme',
-            'traitement_en_cours' => 'Ventoline, 2 bouffées/jour',
         ]);
 
         $response->assertOk();

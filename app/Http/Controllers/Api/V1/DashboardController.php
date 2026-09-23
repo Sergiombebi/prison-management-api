@@ -8,6 +8,7 @@ use App\Models\AffectationCellule;
 use App\Models\Cellule;
 use App\Models\Detenu;
 use App\Models\Mandas;
+use App\Models\Prescription;
 use App\Models\Sanction;
 use App\Models\SortieDetenu;
 use App\Models\Visite;
@@ -48,6 +49,11 @@ class DashboardController extends Controller
                     ->where('date_expiration_mandat', '<', $maintenant->toDateString())
                     ->count(),
                 'sanctions_en_cours' => Sanction::where('est_actif', true)->count(),
+                'traitements_a_renouveler' => Prescription::query()
+                    ->whereNull('arrete_le')
+                    ->whereNotNull('date_fin')
+                    ->whereBetween('date_fin', [$maintenant->toDateString(), $maintenant->addDays(3)->toDateString()])
+                    ->count(),
                 'mouvements' => $this->mouvements($ilYa30Jours),
                 'effectifs_par_categorie' => $this->effectifsParCategorie(),
                 'population_derniers_mois' => $this->populationDerniersMois($maintenant),

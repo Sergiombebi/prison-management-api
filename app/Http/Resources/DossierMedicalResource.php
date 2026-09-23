@@ -37,6 +37,10 @@ class DossierMedicalResource extends JsonResource
             'allergies' => $this->allergies,
             'maladies_chroniques' => $this->maladies_chroniques,
             'traitement_en_cours' => $this->traitement_en_cours,
+            'prescriptions' => $this->when(
+                $this->relationLoaded('prescriptions'),
+                fn () => PrescriptionResource::collection($this->prescriptions),
+            ),
 
             'cellule_actuelle' => $this->when(
                 $this->relationLoaded('affectationActive'),

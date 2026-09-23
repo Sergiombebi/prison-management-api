@@ -49,7 +49,6 @@ class Detenu extends Model
         'groupe_sanguin',
         'allergies',
         'maladies_chroniques',
-        'traitement_en_cours',
         'est_present',
         'created_by',
         'updated_by',
@@ -134,6 +133,25 @@ class Detenu extends Model
         return $this->hasMany(Visite::class);
     }
 
+    public function prescriptions(): HasMany
+    {
+        return $this->hasMany(Prescription::class);
+    }
+
+    /**
+     * Prescriptions actives : pas arrêtées avant terme, et pas arrivées à échéance.
+     * À charger avec ->with() pour afficher le « traitement en cours » calculé
+     * (voir getTraitementEnCoursAttribute()) sans requête par détenu affiché.
+     */
+    public function prescriptionsActives(): HasMany
+    {
+        return $this->hasMany(Prescription::class)
+            ->whereNull('arrete_le')
+            ->where(function (Builder $q) {
+                $q->whereNull('date_fin')->orWhere('date_fin', '>=', now()->startOfDay());
+            });
+    }
+
     /**
      * Vrai si le détenu a encore au moins un mandat actif. Utilisé lors d'une libération
      * normale (après avoir clôturé le mandat concerné) pour savoir si le détenu quitte
@@ -197,6 +215,23 @@ class Detenu extends Model
             $types->every(fn (TypeStatutPenal $t) => $t === TypeStatutPenal::DetentionProvisoire) => CategoriePenale::Prevenus,
             default => null,
         };
+    }
+
+    /**
+     * Résumé du traitement en cours, calculé à partir des prescriptions actives déjà
+     * chargées (relation prescriptionsActives) - remplace l'ancien champ texte libre
+     * ressaisi à la main, pour n'avoir qu'une seule source de vérité (voir les
+     * prescriptions elles-mêmes pour le détail : posologie, prescripteur, dates).
+     */
+    public function getTraitementEnCoursAttribute(): ?string
+    {
+        if (! $this->relationLoaded('prescriptionsActives') || $this->prescriptionsActives->isEmpty()) {
+            return null;
+        }
+
+        return $this->prescriptionsActives
+            ->map(fn (Prescription $p) => "{$p->medicament} ({$p->posologie})")
+            ->implode(', ');
     }
 
     private static function prioriteStatut(TypeStatutPenal $type): int

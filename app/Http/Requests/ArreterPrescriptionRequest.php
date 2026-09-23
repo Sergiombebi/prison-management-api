@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateDossierMedicalRequest extends FormRequest
+class ArreterPrescriptionRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -17,9 +17,8 @@ class UpdateDossierMedicalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'groupe_sanguin' => ['nullable', 'string', 'max:20'],
-            'allergies' => ['nullable', 'string'],
-            'maladies_chroniques' => ['nullable', 'string'],
+            'arrete_le' => ['required', 'date'],
+            'motif_arret' => ['nullable', 'string', 'max:255'],
         ];
     }
 }
