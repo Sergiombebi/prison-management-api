@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CelluleController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DetenuController;
 use App\Http\Controllers\Api\V1\DetenuPhotoController;
+use App\Http\Controllers\Api\V1\EvacuationSanitaireController;
 use App\Http\Controllers\Api\V1\MandasController;
 use App\Http\Controllers\Api\V1\ParametreController;
 use App\Http\Controllers\Api\V1\ParametreLogoController;
@@ -42,6 +43,7 @@ Route::prefix('v1')->group(function () {
         });
         Route::post('/detenus', [DetenuController::class, 'store'])->middleware('permission:detenus.creer');
         Route::put('/detenus/{detenu}', [DetenuController::class, 'update'])->middleware('permission:detenus.modifier');
+        Route::put('/detenus/{detenu}/dossier-medical', [DetenuController::class, 'majDossierMedical'])->middleware('permission:sante.dossier_medical.gerer');
         Route::delete('/detenus/{detenu}', [DetenuController::class, 'destroy'])->middleware('permission:detenus.desactiver');
         Route::post('/detenus/{detenu}/restore', [DetenuController::class, 'restore'])->middleware('permission:detenus.restaurer');
 
@@ -101,6 +103,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'indexForDetenu']);
         });
         Route::post('/detenus/{detenu}/suivis-medicaux', [SuiviMedicalController::class, 'store'])->middleware('permission:sante.consultations.creer');
+
+        Route::middleware('permission:sante.evacuations.consulter')->group(function () {
+            Route::get('/evacuations', [EvacuationSanitaireController::class, 'index']);
+            Route::get('/detenus/{detenu}/evacuations', [EvacuationSanitaireController::class, 'indexForDetenu']);
+        });
+        Route::post('/detenus/{detenu}/evacuations', [EvacuationSanitaireController::class, 'store'])->middleware('permission:sante.evacuations.creer');
+        Route::post('/evacuations/{evacuation}/retour', [EvacuationSanitaireController::class, 'retour'])->middleware('permission:sante.evacuations.creer');
 
         Route::middleware('permission:visites.consulter')->group(function () {
             Route::get('/visites', [VisiteController::class, 'index']);

@@ -57,6 +57,12 @@ class VisiteController extends Controller
             ], 409));
         }
 
+        if ($detenu->evacuationActive()->exists()) {
+            abort(response()->json([
+                'message' => 'Ce détenu est actuellement en évacuation sanitaire : il ne peut pas recevoir de visite.',
+            ], 409));
+        }
+
         $data = $request->validated();
         $data['detenu_id'] = $detenu->id;
         $data['created_by'] = $request->user()->id;

@@ -46,6 +46,10 @@ class Detenu extends Model
         'photo_profil_url',
         'photo_profil_public_id',
         'anthropometrie',
+        'groupe_sanguin',
+        'allergies',
+        'maladies_chroniques',
+        'traitement_en_cours',
         'est_present',
         'created_by',
         'updated_by',
@@ -112,6 +116,17 @@ class Detenu extends Model
     public function suivisMedicaux(): HasMany
     {
         return $this->hasMany(SuiviMedical::class);
+    }
+
+    public function evacuations(): HasMany
+    {
+        return $this->hasMany(EvacuationSanitaire::class);
+    }
+
+    /** Nulle tant qu'aucune évacuation en cours n'a de date de retour : voir la migration. */
+    public function evacuationActive(): HasOne
+    {
+        return $this->hasOne(EvacuationSanitaire::class)->whereNull('date_retour');
     }
 
     public function visites(): HasMany

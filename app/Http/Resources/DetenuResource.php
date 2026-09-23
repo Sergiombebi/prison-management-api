@@ -48,7 +48,16 @@ class DetenuResource extends JsonResource
             'photo_profil_url' => $this->photo_profil_url,
             'anthropometrie' => $this->anthropometrie,
 
+            'groupe_sanguin' => $this->groupe_sanguin,
+            'allergies' => $this->allergies,
+            'maladies_chroniques' => $this->maladies_chroniques,
+            'traitement_en_cours' => $this->traitement_en_cours,
+
             'est_present' => $this->est_present,
+            'evacuation_active' => $this->when(
+                $this->relationLoaded('evacuationActive'),
+                fn () => $this->evacuationActive ? new EvacuationSanitaireResource($this->evacuationActive) : null,
+            ),
 
             'mandas' => MandasResource::collection($this->whenLoaded('mandas')),
             'sanctions' => SanctionResource::collection($this->whenLoaded('sanctions')),

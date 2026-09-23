@@ -26,6 +26,9 @@ enum Permission: string
 
     case SanteConsultationsConsulter = 'sante.consultations.consulter';
     case SanteConsultationsCreer = 'sante.consultations.creer';
+    case SanteDossierMedicalGerer = 'sante.dossier_medical.gerer';
+    case SanteEvacuationsConsulter = 'sante.evacuations.consulter';
+    case SanteEvacuationsCreer = 'sante.evacuations.creer';
 
     case VisitesConsulter = 'visites.consulter';
     case VisitesCreer = 'visites.creer';

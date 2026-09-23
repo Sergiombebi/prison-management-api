@@ -6,6 +6,7 @@ use App\Enums\CategoriePenale;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDetenuRequest;
 use App\Http\Requests\UpdateDetenuRequest;
+use App\Http\Requests\UpdateDossierMedicalRequest;
 use App\Http\Resources\DetenuListResource;
 use App\Http\Resources\DetenuResource;
 use App\Models\Cellule;
@@ -20,7 +21,7 @@ class DetenuController extends Controller
     private const RELATIONS = [
         'createdBy', 'updatedBy', 'mandas', 'affectationActive.cellule',
         'sanctions.typeSanction', 'sanctions.celluleDisciplinaire', 'sanctions.celluleOrigine',
-        'suivisMedicaux', 'visites',
+        'suivisMedicaux', 'visites', 'evacuationActive',
     ];
 
     public function __construct(
@@ -149,6 +150,21 @@ class DetenuController extends Controller
         $data['updated_by'] = $request->user()->id;
 
         DB::transaction(fn () => $detenu->update($data));
+
+        return new DetenuResource($detenu->fresh(self::RELATIONS));
+    }
+
+    /**
+     * État de santé persistant du détenu (groupe sanguin, allergies, maladies
+     * chroniques, traitement en cours) : indépendant de toute consultation précise,
+     * modifiable même sans qu'une consultation soit en cours de saisie.
+     */
+    public function majDossierMedical(UpdateDossierMedicalRequest $request, Detenu $detenu)
+    {
+        $data = $request->validated();
+        $data['updated_by'] = $request->user()->id;
+
+        $detenu->update($data);
 
         return new DetenuResource($detenu->fresh(self::RELATIONS));
     }
