@@ -24,6 +24,7 @@ class MandasResource extends JsonResource
             'reference_mandat' => $this->reference_mandat,
             'date_signature_mandat' => $this->date_signature_mandat?->toDateString(),
             'date_expiration_mandat' => $this->date_expiration_mandat?->toDateString(),
+            'date_sortie_detention_provisoire' => $this->date_sortie_detention_provisoire?->toDateString(),
             'observations_statut' => $this->observations_statut,
             'objets_personnels' => $this->objets_personnels,
             'autorite_penitentiaire' => $this->autorite_penitentiaire,
@@ -34,16 +35,22 @@ class MandasResource extends JsonResource
             'tribunal_jugement' => $this->tribunal_jugement,
             'motif_jugement' => $this->motif_jugement,
             'peine_prononcee' => $this->peine_prononcee,
+            'date_sortie_execution_peine' => $this->date_sortie_execution_peine?->toDateString(),
 
             'date_appel' => $this->date_appel?->toDateString(),
             'tribunal_appel' => $this->tribunal_appel,
             'decision_appel' => $this->decision_appel,
+            'date_sortie_appel' => $this->date_sortie_appel?->toDateString(),
             'observations_appel' => $this->observations_appel,
 
             'date_cassation' => $this->date_cassation?->toDateString(),
             'tribunal_cassation' => $this->tribunal_cassation,
             'decision_cassation' => $this->decision_cassation,
+            'date_sortie_cassation' => $this->date_sortie_cassation?->toDateString(),
             'observations_cassation' => $this->observations_cassation,
+
+            // Calculée, jamais stockée : voir Mandas::getDateSortieEffectiveAttribute().
+            'date_sortie_effective' => $this->date_sortie_effective?->toDateString(),
 
             'est_actif' => $this->est_actif,
 

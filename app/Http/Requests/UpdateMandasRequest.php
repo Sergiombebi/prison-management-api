@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\TypeStatutPenal;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,6 +12,22 @@ class UpdateMandasRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * La date d'expiration n'est plus saisie à la main : elle sert uniquement
+     * d'alerte « mandats expirés » (voir DashboardController), pas de date de
+     * sortie réelle, et se déduit systématiquement de la date de signature - quoi
+     * que le client ait pu envoyer.
+     */
+    protected function prepareForValidation(): void
+    {
+        $signature = $this->input('date_signature_mandat');
+        if ($signature) {
+            $this->merge([
+                'date_expiration_mandat' => Carbon::parse($signature)->addMonths(6)->toDateString(),
+            ]);
+        }
     }
 
     /**
@@ -27,7 +44,8 @@ class UpdateMandasRequest extends FormRequest
             'type_mandat' => ['required', 'string', 'max:255'],
             'reference_mandat' => ['required', 'string', 'max:255'],
             'date_signature_mandat' => ['required', 'date'],
-            'date_expiration_mandat' => ['required', 'date'],
+            'date_expiration_mandat' => ['nullable', 'date'],
+            'date_sortie_detention_provisoire' => ['nullable', 'date'],
             'observations_statut' => ['nullable', 'string'],
             'objets_personnels' => ['nullable', 'string'],
             'autorite_penitentiaire' => ['nullable', 'string', 'max:255'],
@@ -38,15 +56,18 @@ class UpdateMandasRequest extends FormRequest
             'tribunal_jugement' => ['nullable', 'required_if:type_statut_penal,Exécution de peine,Appellant,Cassationnaire', 'string', 'max:255'],
             'motif_jugement' => ['nullable', 'required_if:type_statut_penal,Exécution de peine,Appellant,Cassationnaire', 'string'],
             'peine_prononcee' => ['nullable', 'required_if:type_statut_penal,Exécution de peine,Appellant,Cassationnaire', 'string'],
+            'date_sortie_execution_peine' => ['nullable', 'date'],
 
-            'date_appel' => ['nullable', 'required_if:type_statut_penal,Appellant', 'date'],
-            'tribunal_appel' => ['nullable', 'required_if:type_statut_penal,Appellant', 'string', 'max:255'],
-            'decision_appel' => ['nullable', 'required_if:type_statut_penal,Appellant', 'string'],
+            'date_appel' => ['nullable', 'required_if:type_statut_penal,Appellant,Cassationnaire', 'date'],
+            'tribunal_appel' => ['nullable', 'required_if:type_statut_penal,Appellant,Cassationnaire', 'string', 'max:255'],
+            'decision_appel' => ['nullable', 'required_if:type_statut_penal,Cassationnaire', 'string'],
+            'date_sortie_appel' => ['nullable', 'required_if:type_statut_penal,Cassationnaire', 'date'],
             'observations_appel' => ['nullable', 'string'],
 
             'date_cassation' => ['nullable', 'required_if:type_statut_penal,Cassationnaire', 'date'],
             'tribunal_cassation' => ['nullable', 'required_if:type_statut_penal,Cassationnaire', 'string', 'max:255'],
-            'decision_cassation' => ['nullable', 'required_if:type_statut_penal,Cassationnaire', 'string'],
+            'decision_cassation' => ['nullable', 'string'],
+            'date_sortie_cassation' => ['nullable', 'date'],
             'observations_cassation' => ['nullable', 'string'],
         ];
     }
