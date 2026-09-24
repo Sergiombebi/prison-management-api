@@ -31,16 +31,18 @@ class DetenuController extends Controller
     }
 
     /**
-     * Liste minimale (id, numéro d'écrou, nom) de tous les détenus présents, sans pagination :
-     * alimente les listes déroulantes de sélection d'un détenu (formulaires de santé,
-     * discipline, sorties…), qui n'ont besoin d'aucune autre donnée. Évite qu'un écran doive
-     * parcourir toutes les pages de `GET /detenus` (plafonné à 10 par page) juste pour peupler
-     * un `<select>`.
+     * Liste minimale (id, numéro d'écrou, nom, cellule) de tous les détenus présents, sans
+     * pagination : alimente les listes déroulantes de sélection d'un détenu (formulaires de
+     * santé, discipline, sorties…). La cellule reste incluse - un seul eager load pour toute
+     * la liste, pas une requête par détenu - car le ticket de visite imprimé en a besoin.
+     * Évite qu'un écran doive parcourir toutes les pages de `GET /detenus` (plafonné à 10 par
+     * page) juste pour peupler un `<select>`.
      */
     public function options()
     {
         $detenus = Detenu::query()
             ->where('est_present', true)
+            ->with('affectationActive.cellule')
             ->orderBy('nom')
             ->get(['id', 'numero_ecrou', 'nom']);
 
@@ -49,6 +51,9 @@ class DetenuController extends Controller
                 'id' => $d->id,
                 'numero_ecrou' => $d->numero_ecrou,
                 'nom' => $d->nom,
+                'cellule' => $d->affectationActive?->cellule
+                    ? ['numero' => $d->affectationActive->cellule->numero, 'bloc' => $d->affectationActive->cellule->bloc]
+                    : null,
             ]),
         ]);
     }

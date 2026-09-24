@@ -230,8 +230,21 @@ class DetenuListingTest extends TestCase
         // Pas de pagination : les 15 détenus présents remontent en un seul appel,
         // contrairement à /detenus qui plafonne à 10 par page.
         $response->assertJsonCount(15, 'data');
-        $response->assertJsonStructure(['data' => [['id', 'numero_ecrou', 'nom']]]);
+        $response->assertJsonStructure(['data' => [['id', 'numero_ecrou', 'nom', 'cellule']]]);
         $this->assertFalse(collect($response->json('data'))->contains('id', $absent->id));
+    }
+
+    public function test_options_inclut_la_cellule_sans_requete_par_detenu(): void
+    {
+        $d = $this->creerDetenu();
+        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
+        AffectationCellule::create(['detenu_id' => $d->id, 'cellule_id' => $cellule->id, 'date_affectation' => now()]);
+        $this->creerDetenu();
+
+        $response = $this->getJson('/api/v1/detenus/options');
+
+        $response->assertOk();
+        $response->assertJsonFragment(['cellule' => ['numero' => 'C1', 'bloc' => 'A']]);
     }
 
     public function test_options_trie_par_nom(): void
