@@ -99,18 +99,43 @@ class DashboardTest extends TestCase
 
     public function test_liberables_ce_mois_et_sorties_prevues_mois_prochain(): void
     {
+        // La date de sortie EFFECTIVE (calculée, jamais l'alerte date_expiration_mandat)
+        // pilote désormais ce widget : pour un prévenu, c'est date_sortie_detention_provisoire.
         $liberableCeMois = $this->creerDetenu(['nom' => 'Liberable CeMois']);
-        $this->creerMandas($liberableCeMois, ['date_expiration_mandat' => now()->endOfMonth()->toDateString()]);
+        $this->creerMandas($liberableCeMois, ['date_sortie_detention_provisoire' => now()->endOfMonth()->toDateString()]);
 
         $liberableMoisProchain = $this->creerDetenu(['nom' => 'Liberable MoisProchain']);
-        $this->creerMandas($liberableMoisProchain, ['date_expiration_mandat' => now()->addMonthNoOverflow()->startOfMonth()->addDays(2)->toDateString()]);
+        $this->creerMandas($liberableMoisProchain, ['date_sortie_detention_provisoire' => now()->addMonthNoOverflow()->startOfMonth()->addDays(2)->toDateString()]);
+
+        // Un mandat sans date de sortie renseignée ne doit apparaître dans aucun des deux.
+        $sansDateSortie = $this->creerDetenu(['nom' => 'Sans Date']);
+        $this->creerMandas($sansDateSortie, ['date_expiration_mandat' => now()->endOfMonth()->toDateString()]);
 
         $response = $this->getJson('/api/v1/tableau-de-bord');
 
         $response->assertOk();
         $response->assertJsonCount(1, 'data.liberables_ce_mois');
         $response->assertJsonPath('data.liberables_ce_mois.0.nom', 'Liberable CeMois');
+        $response->assertJsonPath('data.liberables_ce_mois.0.date_sortie', now()->endOfMonth()->toDateString());
         $response->assertJsonPath('data.sorties_prevues_mois_prochain', 1);
+    }
+
+    public function test_liberables_ce_mois_suit_la_cascade_appel_cassation(): void
+    {
+        // Cassationnaire dont l'appel a une décision mais pas encore la cassation :
+        // la date de sortie effective retombe sur celle de l'appel.
+        $detenu = $this->creerDetenu(['nom' => 'Cassationnaire Libérable']);
+        $this->creerMandas($detenu, [
+            'type_statut_penal' => 'Cassationnaire',
+            'date_sortie_execution_peine' => now()->addYears(2)->toDateString(),
+            'date_sortie_appel' => now()->endOfMonth()->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/tableau-de-bord');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data.liberables_ce_mois');
+        $response->assertJsonPath('data.liberables_ce_mois.0.nom', 'Cassationnaire Libérable');
     }
 
     public function test_visites_aujourdhui(): void

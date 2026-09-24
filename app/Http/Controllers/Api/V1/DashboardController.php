@@ -42,7 +42,7 @@ class DashboardController extends Controller
                 'taux_occupation' => $capaciteTotale > 0 ? round($cellulesOccupees / $capaciteTotale * 100, 1) : 0.0,
                 'effectif_mois_precedent' => $this->populationAuPlusTard($debutMoisCourant),
                 'visites_aujourdhui' => Visite::whereDate('date_visite', $maintenant->toDateString())->count(),
-                'sorties_prevues_mois_prochain' => $this->mandatsExpirantEntre($debutMoisProchain, $finMoisProchain)->count(),
+                'sorties_prevues_mois_prochain' => $this->mandatsLiberablesEntre($debutMoisProchain, $finMoisProchain)->count(),
                 'mandats_expires' => Mandas::query()
                     ->where('est_actif', true)
                     ->whereNotNull('date_expiration_mandat')
@@ -63,22 +63,33 @@ class DashboardController extends Controller
     }
 
     /**
-     * Mandats actifs dont l'expiration tombe dans l'intervalle donné - base commune à
-     * "sorties prévues le mois prochain" et "libérables ce mois".
+     * Mandats actifs dont la date de sortie EFFECTIVE tombe dans l'intervalle donné -
+     * base commune à "sorties prévues le mois prochain" et "libérables ce mois".
+     * C'est la date calculée à partir de la procédure (détention provisoire,
+     * exécution de peine, appel, cassation - voir Mandas::getDateSortieEffectiveAttribute()),
+     * jamais `date_expiration_mandat` qui n'est qu'une alerte "mandats expirés" et
+     * n'a plus grand-chose à voir avec une sortie réelle depuis qu'elle est calculée
+     * automatiquement à signature + 6 mois.
      *
-     * Bornes en datetime complet (pas juste la date) : le cast 'date' d'Eloquent stocke
-     * en réalité un timestamp "YYYY-MM-DD 00:00:00", donc comparer à une simple date
-     * ("YYYY-MM-DD") exclurait à tort la borne de fin en comparaison de chaînes.
+     * N'étant pas une colonne, elle ne se filtre pas en SQL : on charge les mandats
+     * actifs et on filtre en PHP - un volume qui reste largement raisonnable pour un
+     * établissement pénitentiaire.
      */
-    private function mandatsExpirantEntre(CarbonImmutable $debut, CarbonImmutable $fin)
+    private function mandatsLiberablesEntre(CarbonImmutable $debut, CarbonImmutable $fin)
     {
+        $debutJour = $debut->startOfDay();
+        $finJour = $fin->endOfDay();
+
         return Mandas::query()
             ->where('est_actif', true)
-            ->whereNotNull('date_expiration_mandat')
-            ->whereBetween('date_expiration_mandat', [
-                $debut->startOfDay()->toDateTimeString(),
-                $fin->endOfDay()->toDateTimeString(),
-            ]);
+            ->with('detenu')
+            ->get()
+            ->filter(function (Mandas $mandat) use ($debutJour, $finJour) {
+                $date = $mandat->date_sortie_effective;
+
+                return $date !== null && $date->between($debutJour, $finJour);
+            })
+            ->sortBy(fn (Mandas $mandat) => $mandat->date_sortie_effective);
     }
 
     /**
@@ -86,15 +97,12 @@ class DashboardController extends Controller
      */
     private function liberables(CarbonImmutable $debutMois, CarbonImmutable $finMois): array
     {
-        return $this->mandatsExpirantEntre($debutMois, $finMois)
-            ->with('detenu')
-            ->orderBy('date_expiration_mandat')
-            ->get()
+        return $this->mandatsLiberablesEntre($debutMois, $finMois)
             ->map(fn (Mandas $mandat) => [
                 'numero_ecrou' => $mandat->detenu->numero_ecrou,
                 'nom' => $mandat->detenu->nom,
                 'date_incarceration' => $mandat->date_incarceration?->toDateString(),
-                'date_expiration' => $mandat->date_expiration_mandat?->toDateString(),
+                'date_sortie' => $mandat->date_sortie_effective?->toDateString(),
                 'statut' => $mandat->type_statut_penal?->value,
             ])
             ->values()
