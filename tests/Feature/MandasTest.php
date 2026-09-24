@@ -139,6 +139,44 @@ class MandasTest extends TestCase
         $response->assertJsonPath('data.date_sortie_effective', '2027-08-15');
     }
 
+    public function test_appel_hors_delai_est_une_alerte_non_bloquante(): void
+    {
+        $detenu = $this->creerDetenu();
+
+        // 14 jours après le jugement : au-delà du délai habituel de 10 jours.
+        $horsDelai = $this->postJson("/api/v1/detenus/{$detenu->id}/mandas", $this->champsBase([
+            'type_statut_penal' => 'Appellant',
+            'date_jugement' => '2026-02-01',
+            'reference_jugement' => 'JUG-001',
+            'tribunal_jugement' => 'TGI Yaoundé',
+            'motif_jugement' => 'Vol aggravé',
+            'peine_prononcee' => '2 ans de prison',
+            'date_sortie_execution_peine' => '2028-02-01',
+            'date_appel' => '2026-02-15',
+            'tribunal_appel' => "Cour d'Appel du Centre",
+        ]));
+
+        // Jamais rejetée : l'alerte est informative, elle ne bloque pas l'enregistrement.
+        $horsDelai->assertCreated();
+        $horsDelai->assertJsonPath('data.appel_hors_delai', true);
+
+        $detenu2 = $this->creerDetenu();
+        $dansLesDelais = $this->postJson("/api/v1/detenus/{$detenu2->id}/mandas", $this->champsBase([
+            'type_statut_penal' => 'Appellant',
+            'date_jugement' => '2026-02-01',
+            'reference_jugement' => 'JUG-002',
+            'tribunal_jugement' => 'TGI Yaoundé',
+            'motif_jugement' => 'Vol aggravé',
+            'peine_prononcee' => '2 ans de prison',
+            'date_sortie_execution_peine' => '2028-02-01',
+            'date_appel' => '2026-02-08',
+            'tribunal_appel' => "Cour d'Appel du Centre",
+        ]));
+
+        $dansLesDelais->assertCreated();
+        $dansLesDelais->assertJsonPath('data.appel_hors_delai', false);
+    }
+
     public function test_cassation_requiert_la_decision_dappel_et_sa_date_de_sortie(): void
     {
         $detenu = $this->creerDetenu();

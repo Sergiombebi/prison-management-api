@@ -13,6 +13,8 @@ use App\Models\Sanction;
 use App\Models\SortieDetenu;
 use App\Models\Visite;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
@@ -21,7 +23,22 @@ class DashboardController extends Controller
         7 => 'Juil.', 8 => 'Août', 9 => 'Sept.', 10 => 'Oct.', 11 => 'Nov.', 12 => 'Déc.',
     ];
 
+    /**
+     * Agrégats coûteux (une vingtaine de requêtes malgré les optimisations ci-dessous) sur la
+     * page la plus visitée de l'app : un cache très court absorbe l'essentiel des rechargements
+     * sans jamais afficher une donnée sensiblement périmée pour un usage administratif.
+     */
     public function index()
+    {
+        $data = Cache::remember('tableau-de-bord', 30, fn () => $this->calculer());
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function calculer(): array
     {
         $maintenant = CarbonImmutable::now();
         $debutMoisCourant = $maintenant->startOfMonth();
@@ -34,56 +51,58 @@ class DashboardController extends Controller
         $capaciteTotale = (int) Cellule::sum('capacite_max');
         $cellulesOccupees = AffectationCellule::whereNull('date_fin')->count();
 
-        return response()->json([
-            'data' => [
-                'genere_le' => $maintenant->toIso8601String(),
-                'effectif' => $effectif,
-                'capacite_totale' => $capaciteTotale,
-                'taux_occupation' => $capaciteTotale > 0 ? round($cellulesOccupees / $capaciteTotale * 100, 1) : 0.0,
-                'effectif_mois_precedent' => $this->populationAuPlusTard($debutMoisCourant),
-                'visites_aujourdhui' => Visite::whereDate('date_visite', $maintenant->toDateString())->count(),
-                'sorties_prevues_mois_prochain' => $this->mandatsLiberablesEntre($debutMoisProchain, $finMoisProchain)->count(),
-                'mandats_expires' => Mandas::query()
-                    ->where('est_actif', true)
-                    ->whereNotNull('date_expiration_mandat')
-                    ->where('date_expiration_mandat', '<', $maintenant->toDateString())
-                    ->count(),
-                'sanctions_en_cours' => Sanction::where('est_actif', true)->count(),
-                'traitements_a_renouveler' => Prescription::query()
-                    ->whereNull('arrete_le')
-                    ->whereNotNull('date_fin')
-                    ->whereBetween('date_fin', [$maintenant->toDateString(), $maintenant->addDays(3)->toDateString()])
-                    ->count(),
-                'mouvements' => $this->mouvements($ilYa30Jours),
-                'effectifs_par_categorie' => $this->effectifsParCategorie(),
-                'population_derniers_mois' => $this->populationDerniersMois($maintenant),
-                'liberables_ce_mois' => $this->liberables($debutMoisCourant, $finMoisCourant),
-            ],
-        ]);
+        // Chargée une seule fois : sert à la fois aux sorties prévues le mois prochain et aux
+        // libérables ce mois (avant, deux appels identiques à mandatsLiberablesEntre()).
+        $mandatsActifs = Mandas::query()->where('est_actif', true)->with('detenu')->get();
+
+        return [
+            'genere_le' => $maintenant->toIso8601String(),
+            'effectif' => $effectif,
+            'capacite_totale' => $capaciteTotale,
+            'taux_occupation' => $capaciteTotale > 0 ? round($cellulesOccupees / $capaciteTotale * 100, 1) : 0.0,
+            'effectif_mois_precedent' => $this->populationAuPlusTard($debutMoisCourant, $effectif),
+            'visites_aujourdhui' => Visite::whereDate('date_visite', $maintenant->toDateString())->count(),
+            'sorties_prevues_mois_prochain' => $this->filtrerLiberables($mandatsActifs, $debutMoisProchain, $finMoisProchain)->count(),
+            'mandats_expires' => Mandas::query()
+                ->where('est_actif', true)
+                ->whereNotNull('date_expiration_mandat')
+                ->where('date_expiration_mandat', '<', $maintenant->toDateString())
+                ->count(),
+            'sanctions_en_cours' => Sanction::where('est_actif', true)->count(),
+            'traitements_a_renouveler' => Prescription::query()
+                ->whereNull('arrete_le')
+                ->whereNotNull('date_fin')
+                ->whereBetween('date_fin', [$maintenant->toDateString(), $maintenant->addDays(3)->toDateString()])
+                ->count(),
+            'mouvements' => $this->mouvements($ilYa30Jours),
+            'effectifs_par_categorie' => $this->effectifsParCategorie(),
+            'population_derniers_mois' => $this->populationDerniersMois($maintenant, $effectif),
+            'liberables_ce_mois' => $this->liberables($mandatsActifs, $debutMoisCourant, $finMoisCourant),
+        ];
     }
 
     /**
-     * Mandats actifs dont la date de sortie EFFECTIVE tombe dans l'intervalle donné -
-     * base commune à "sorties prévues le mois prochain" et "libérables ce mois".
-     * C'est la date calculée à partir de la procédure (détention provisoire,
-     * exécution de peine, appel, cassation - voir Mandas::getDateSortieEffectiveAttribute()),
-     * jamais `date_expiration_mandat` qui n'est qu'une alerte "mandats expirés" et
-     * n'a plus grand-chose à voir avec une sortie réelle depuis qu'elle est calculée
-     * automatiquement à signature + 6 mois.
+     * Filtre les mandats actifs (déjà chargés une seule fois par `calculer()`) dont la date de
+     * sortie EFFECTIVE tombe dans l'intervalle donné - base commune à "sorties prévues le mois
+     * prochain" et "libérables ce mois". C'est la date calculée à partir de la procédure
+     * (détention provisoire, exécution de peine, appel, cassation - voir
+     * Mandas::getDateSortieEffectiveAttribute()), jamais `date_expiration_mandat` qui n'est
+     * qu'une alerte "mandats expirés" et n'a plus grand-chose à voir avec une sortie réelle
+     * depuis qu'elle est calculée automatiquement à signature + 6 mois.
      *
-     * N'étant pas une colonne, elle ne se filtre pas en SQL : on charge les mandats
-     * actifs et on filtre en PHP - un volume qui reste largement raisonnable pour un
-     * établissement pénitentiaire.
+     * N'étant pas une colonne, elle ne se filtre pas en SQL : on filtre en PHP la collection
+     * déjà en mémoire - un volume qui reste largement raisonnable pour un établissement
+     * pénitentiaire.
+     *
+     * @param  Collection<int, Mandas>  $mandatsActifs
+     * @return Collection<int, Mandas>
      */
-    private function mandatsLiberablesEntre(CarbonImmutable $debut, CarbonImmutable $fin)
+    private function filtrerLiberables(Collection $mandatsActifs, CarbonImmutable $debut, CarbonImmutable $fin): Collection
     {
         $debutJour = $debut->startOfDay();
         $finJour = $fin->endOfDay();
 
-        return Mandas::query()
-            ->where('est_actif', true)
-            ->with('detenu')
-            ->get()
+        return $mandatsActifs
             ->filter(function (Mandas $mandat) use ($debutJour, $finJour) {
                 $date = $mandat->date_sortie_effective;
 
@@ -93,11 +112,12 @@ class DashboardController extends Controller
     }
 
     /**
+     * @param  Collection<int, Mandas>  $mandatsActifs
      * @return array<string, mixed>
      */
-    private function liberables(CarbonImmutable $debutMois, CarbonImmutable $finMois): array
+    private function liberables(Collection $mandatsActifs, CarbonImmutable $debutMois, CarbonImmutable $finMois): array
     {
-        return $this->mandatsLiberablesEntre($debutMois, $finMois)
+        return $this->filtrerLiberables($mandatsActifs, $debutMois, $finMois)
             ->map(fn (Mandas $mandat) => [
                 'numero_ecrou' => $mandat->detenu->numero_ecrou,
                 'nom' => $mandat->detenu->nom,
@@ -156,12 +176,12 @@ class DashboardController extends Controller
 
     /**
      * Population présente reconstituée à une date passée : aucune table d'historique
-     * n'existe, donc on part de l'effectif actuel et on annule ce qui s'est passé
-     * depuis cette date (arrivées à retirer, sorties définitives à rajouter).
+     * n'existe, donc on part de l'effectif actuel (déjà connu de l'appelant, jamais
+     * recalculé ici) et on annule ce qui s'est passé depuis cette date (arrivées à
+     * retirer, sorties définitives à rajouter).
      */
-    private function populationAuPlusTard(CarbonImmutable $date): int
+    private function populationAuPlusTard(CarbonImmutable $date, int $effectifActuel): int
     {
-        $effectifActuel = Detenu::where('est_present', true)->count();
         $arriveesDepuis = Detenu::where('created_at', '>=', $date)->count();
         $sortiesDefinitivesDepuis = SortieDetenu::where('sortie_definitive', true)
             ->where('date_sortie', '>=', $date->toDateString())
@@ -171,19 +191,33 @@ class DashboardController extends Controller
     }
 
     /**
+     * Mêmes 6 points que `populationAuPlusTard()` appelée 6 fois, mais les arrivées et sorties
+     * de toute la fenêtre de 6 mois ne sont récupérées qu'une fois (2 requêtes au lieu de 12) ;
+     * le filtrage par date de chaque point se fait ensuite en mémoire sur ce jeu déjà réduit.
+     *
      * @return array<int, array<string, mixed>>
      */
-    private function populationDerniersMois(CarbonImmutable $maintenant): array
+    private function populationDerniersMois(CarbonImmutable $maintenant, int $effectifActuel): array
     {
+        $debutFenetre = $maintenant->subMonthsNoOverflow(5)->startOfMonth();
+
+        $arrivees = Detenu::where('created_at', '>=', $debutFenetre)->pluck('created_at');
+        $sorties = SortieDetenu::where('sortie_definitive', true)
+            ->where('date_sortie', '>=', $debutFenetre->toDateString())
+            ->pluck('date_sortie');
+
         $points = [];
 
         for ($i = 5; $i >= 0; $i--) {
             $mois = $maintenant->subMonthsNoOverflow($i);
             $reference = $i === 0 ? $maintenant : $mois->endOfMonth();
 
+            $arriveesDepuis = $arrivees->filter(fn ($d) => CarbonImmutable::parse($d)->greaterThanOrEqualTo($reference))->count();
+            $sortiesDepuis = $sorties->filter(fn ($d) => CarbonImmutable::parse($d)->greaterThanOrEqualTo($reference))->count();
+
             $points[] = [
                 'label' => self::MOIS_FR[(int) $mois->format('n')],
-                'population' => $this->populationAuPlusTard($reference),
+                'population' => max(0, $effectifActuel - $arriveesDepuis + $sortiesDepuis),
             ];
         }
 

@@ -38,6 +38,8 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:detenus.creer');
 
         Route::middleware('permission:detenus.consulter')->group(function () {
+            // Avant /detenus/{detenu}, même piège que verifier-identite ci-dessus.
+            Route::get('/detenus/options', [DetenuController::class, 'options']);
             Route::get('/detenus', [DetenuController::class, 'index']);
             Route::get('/detenus/{detenu}', [DetenuController::class, 'show']);
             Route::get('/cellules/{cellule}/detenus', [DetenuController::class, 'indexForCellule']);
@@ -57,6 +59,8 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('permission:discipline.cellules.consulter')->group(function () {
+            // Avant /cellules/{cellule}, même piège que verifier-identite plus haut.
+            Route::get('/cellules/options', [CelluleController::class, 'options']);
             Route::get('/cellules', [CelluleController::class, 'index']);
             Route::get('/cellules/{cellule}', [CelluleController::class, 'show']);
         });

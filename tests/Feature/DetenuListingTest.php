@@ -216,4 +216,33 @@ class DetenuListingTest extends TestCase
         $sousLeMinimum->assertOk();
         $sousLeMinimum->assertJsonCount(1, 'data');
     }
+
+    public function test_options_renvoie_tous_les_detenus_presents_en_un_seul_appel(): void
+    {
+        for ($i = 0; $i < 15; $i++) {
+            $this->creerDetenu();
+        }
+        $absent = $this->creerDetenu(['est_present' => false]);
+
+        $response = $this->getJson('/api/v1/detenus/options');
+
+        $response->assertOk();
+        // Pas de pagination : les 15 détenus présents remontent en un seul appel,
+        // contrairement à /detenus qui plafonne à 10 par page.
+        $response->assertJsonCount(15, 'data');
+        $response->assertJsonStructure(['data' => [['id', 'numero_ecrou', 'nom']]]);
+        $this->assertFalse(collect($response->json('data'))->contains('id', $absent->id));
+    }
+
+    public function test_options_trie_par_nom(): void
+    {
+        $this->creerDetenu(['nom' => 'Zoé Martin']);
+        $this->creerDetenu(['nom' => 'Amine Traoré']);
+
+        $response = $this->getJson('/api/v1/detenus/options');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.nom', 'Amine Traoré');
+        $response->assertJsonPath('data.1.nom', 'Zoé Martin');
+    }
 }

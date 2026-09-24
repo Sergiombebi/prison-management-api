@@ -25,6 +25,28 @@ class CelluleController extends Controller
         return CelluleResource::collection($cellules);
     }
 
+    /**
+     * Liste minimale de toutes les cellules, sans pagination : alimente les listes déroulantes
+     * d'affectation. Volume toujours borné par la capacité physique de l'établissement, jamais
+     * un problème à charger en une seule fois.
+     */
+    public function options()
+    {
+        $cellules = Cellule::query()
+            ->orderBy('bloc')
+            ->orderBy('numero')
+            ->get(['id', 'numero', 'bloc', 'capacite_max']);
+
+        return response()->json([
+            'data' => $cellules->map(fn (Cellule $c) => [
+                'id' => $c->id,
+                'numero' => $c->numero,
+                'bloc' => $c->bloc,
+                'capacite_max' => $c->capacite_max,
+            ]),
+        ]);
+    }
+
     public function show(Cellule $cellule)
     {
         return new CelluleResource($cellule->load(self::RELATIONS));

@@ -92,6 +92,29 @@ class Mandas extends Model
         };
     }
 
+    /**
+     * Alerte non bloquante : l'appel doit en principe être formé dans les 10 jours suivant la
+     * condamnation (date_jugement). Ce n'est jamais une contrainte de saisie (un appel hors
+     * délai peut légitimement exister - exception, force majeure...), seulement une indication
+     * affichée côté client, dans le même esprit que `date_expiration_mandat` pour la détention
+     * provisoire (voir DashboardController).
+     */
+    public function getAppelHorsDelaiAttribute(): bool
+    {
+        if (! $this->date_jugement || ! $this->date_appel) {
+            return false;
+        }
+
+        return $this->date_appel->gt((clone $this->date_jugement)->addDays(10));
+    }
+
+    // Pas d'équivalent "cassation_hors_delai" : il faudrait la date de la décision d'appel,
+    // qui n'existe comme colonne nulle part (`date_sortie_appel` est une date de sortie
+    // effective, pas la date de la décision - vérifié sur des données réalistes où l'une
+    // est très postérieure à l'autre). Utiliser ce champ comme repère produirait une alerte
+    // trompeuse sur un délai légal ; à ajouter proprement (nouveau champ dédié) avec le
+    // développeur backend plutôt que d'improviser un proxy incorrect.
+
     public function detenu(): BelongsTo
     {
         return $this->belongsTo(Detenu::class);

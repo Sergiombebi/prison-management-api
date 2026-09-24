@@ -157,4 +157,17 @@ class CelluleAssignmentTest extends TestCase
         $response->assertJsonPath('data.0.detenu.id', $detenu2->id);
         $response->assertJsonPath('data.1.detenu.id', $detenu1->id);
     }
+
+    public function test_options_renvoie_toutes_les_cellules_sans_pagination(): void
+    {
+        for ($i = 1; $i <= 12; $i++) {
+            Cellule::create(['numero' => "C{$i}", 'bloc' => 'A', 'capacite_max' => 4]);
+        }
+
+        $response = $this->getJson('/api/v1/cellules/options');
+
+        $response->assertOk();
+        $response->assertJsonCount(12, 'data');
+        $response->assertJsonStructure(['data' => [['id', 'numero', 'bloc', 'capacite_max']]]);
+    }
 }

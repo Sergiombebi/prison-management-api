@@ -30,6 +30,29 @@ class DetenuController extends Controller
     ) {
     }
 
+    /**
+     * Liste minimale (id, numéro d'écrou, nom) de tous les détenus présents, sans pagination :
+     * alimente les listes déroulantes de sélection d'un détenu (formulaires de santé,
+     * discipline, sorties…), qui n'ont besoin d'aucune autre donnée. Évite qu'un écran doive
+     * parcourir toutes les pages de `GET /detenus` (plafonné à 10 par page) juste pour peupler
+     * un `<select>`.
+     */
+    public function options()
+    {
+        $detenus = Detenu::query()
+            ->where('est_present', true)
+            ->orderBy('nom')
+            ->get(['id', 'numero_ecrou', 'nom']);
+
+        return response()->json([
+            'data' => $detenus->map(fn (Detenu $d) => [
+                'id' => $d->id,
+                'numero_ecrou' => $d->numero_ecrou,
+                'nom' => $d->nom,
+            ]),
+        ]);
+    }
+
     public function index(Request $request)
     {
         $query = Detenu::query()

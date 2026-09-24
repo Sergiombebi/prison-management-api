@@ -42,12 +42,15 @@ class MandasResource extends JsonResource
             'decision_appel' => $this->decision_appel,
             'date_sortie_appel' => $this->date_sortie_appel?->toDateString(),
             'observations_appel' => $this->observations_appel,
+            // Alerte non bloquante : voir Mandas::getAppelHorsDelaiAttribute().
+            'appel_hors_delai' => $this->appel_hors_delai,
 
             'date_cassation' => $this->date_cassation?->toDateString(),
             'tribunal_cassation' => $this->tribunal_cassation,
             'decision_cassation' => $this->decision_cassation,
             'date_sortie_cassation' => $this->date_sortie_cassation?->toDateString(),
             'observations_cassation' => $this->observations_cassation,
+            // Pas de "cassation_hors_delai" : voir le commentaire dans Mandas.php.
 
             // Calculée, jamais stockée : voir Mandas::getDateSortieEffectiveAttribute().
             'date_sortie_effective' => $this->date_sortie_effective?->toDateString(),
