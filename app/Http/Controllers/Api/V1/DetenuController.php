@@ -30,23 +30,41 @@ class DetenuController extends Controller
     ) {
     }
 
+    private const OPTIONS_LIMITE = 20;
+
     /**
-     * Liste minimale (id, numéro d'écrou, nom, cellule) de tous les détenus présents, sans
-     * pagination : alimente les listes déroulantes de sélection d'un détenu (formulaires de
-     * santé, discipline, sorties…). La cellule reste incluse - un seul eager load pour toute
-     * la liste, pas une requête par détenu - car le ticket de visite imprimé en a besoin.
-     * Évite qu'un écran doive parcourir toutes les pages de `GET /detenus` (plafonné à 10 par
-     * page) juste pour peupler un `<select>`.
+     * Liste minimale (id, numéro d'écrou, nom, cellule) de détenus présents, pour peupler les
+     * listes déroulantes de sélection d'un détenu (formulaires de santé, discipline, sorties…).
+     * Toujours plafonnée à 20 résultats par appel : avec plusieurs milliers de détenus, tout
+     * renvoyer d'un coup rendrait le select inutilisable côté navigateur et pèserait sur chaque
+     * page qui en a besoin. `decalage` permet au front de charger « les 20 suivants » sans
+     * tout redemander - la population entière reste donc accessible, par pages de 20, avec ou
+     * sans terme de recherche (nom ou numéro d'écrou).
      */
-    public function options()
+    public function options(Request $request)
     {
-        $detenus = Detenu::query()
+        $terme = trim((string) $request->query('recherche', ''));
+        $decalage = max(0, (int) $request->query('decalage', 0));
+
+        $requete = Detenu::query()
             ->where('est_present', true)
+            ->when($terme !== '', fn ($q) => $q->where(function ($q) use ($terme) {
+                $q->where('nom', 'like', "%{$terme}%")
+                    ->orWhere('numero_ecrou', 'like', "%{$terme}%");
+            }))
             ->with('affectationActive.cellule')
-            ->orderBy('nom')
+            ->orderBy('nom');
+
+        // Une ligne de plus que la limite : sert uniquement à savoir s'il reste une page
+        // suivante, sans faire de COUNT() séparé sur toute la population.
+        $detenus = (clone $requete)->skip($decalage)->limit(self::OPTIONS_LIMITE + 1)
             ->get(['id', 'numero_ecrou', 'nom']);
 
+        $aPlus = $detenus->count() > self::OPTIONS_LIMITE;
+        $detenus = $detenus->take(self::OPTIONS_LIMITE);
+
         return response()->json([
+            'a_plus' => $aPlus,
             'data' => $detenus->map(fn (Detenu $d) => [
                 'id' => $d->id,
                 'numero_ecrou' => $d->numero_ecrou,

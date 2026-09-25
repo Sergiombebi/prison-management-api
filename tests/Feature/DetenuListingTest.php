@@ -217,9 +217,9 @@ class DetenuListingTest extends TestCase
         $sousLeMinimum->assertJsonCount(1, 'data');
     }
 
-    public function test_options_renvoie_tous_les_detenus_presents_en_un_seul_appel(): void
+    public function test_options_sans_terme_de_recherche_renvoie_les_detenus_presents(): void
     {
-        for ($i = 0; $i < 15; $i++) {
+        for ($i = 0; $i < 3; $i++) {
             $this->creerDetenu();
         }
         $absent = $this->creerDetenu(['est_present' => false]);
@@ -227,21 +227,123 @@ class DetenuListingTest extends TestCase
         $response = $this->getJson('/api/v1/detenus/options');
 
         $response->assertOk();
-        // Pas de pagination : les 15 détenus présents remontent en un seul appel,
-        // contrairement à /detenus qui plafonne à 10 par page.
+        $response->assertJsonCount(3, 'data');
+        $this->assertFalse(collect($response->json('data'))->contains('id', $absent->id));
+    }
+
+    public function test_options_avec_un_terme_dune_seule_lettre_filtre_deja(): void
+    {
+        $this->creerDetenu(['nom' => 'Jean Dupont']);
+        $this->creerDetenu(['nom' => 'Amine Traoré']);
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=J');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.nom', 'Jean Dupont');
+    }
+
+    public function test_options_recherche_les_detenus_presents_par_nom(): void
+    {
+        for ($i = 0; $i < 15; $i++) {
+            $this->creerDetenu(['nom' => 'Jean Dupont']);
+        }
+        $absent = $this->creerDetenu(['nom' => 'Jean Dupont', 'est_present' => false]);
+        $this->creerDetenu(['nom' => 'Amine Traoré']);
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=Dupont');
+
+        $response->assertOk();
         $response->assertJsonCount(15, 'data');
         $response->assertJsonStructure(['data' => [['id', 'numero_ecrou', 'nom', 'cellule']]]);
         $this->assertFalse(collect($response->json('data'))->contains('id', $absent->id));
     }
 
-    public function test_options_inclut_la_cellule_sans_requete_par_detenu(): void
+    public function test_options_recherche_les_detenus_par_numero_ecrou(): void
     {
-        $d = $this->creerDetenu();
-        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
-        AffectationCellule::create(['detenu_id' => $d->id, 'cellule_id' => $cellule->id, 'date_affectation' => now()]);
-        $this->creerDetenu();
+        $this->creerDetenu(['numero_ecrou' => 'MAT-00042', 'nom' => 'Jean Dupont']);
+        $this->creerDetenu(['numero_ecrou' => 'AUTRE-001', 'nom' => 'Amine Traoré']);
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=MAT-000');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.numero_ecrou', 'MAT-00042');
+    }
+
+    public function test_options_plafonne_a_vingt_resultats(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $this->creerDetenu(['nom' => 'Jean Dupont']);
+        }
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=Dupont');
+
+        $response->assertOk();
+        $response->assertJsonCount(20, 'data');
+        $response->assertJsonPath('a_plus', true);
+    }
+
+    public function test_options_plafonne_a_vingt_resultats_sans_terme_de_recherche(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $this->creerDetenu();
+        }
 
         $response = $this->getJson('/api/v1/detenus/options');
+
+        $response->assertOk();
+        $response->assertJsonCount(20, 'data');
+        $response->assertJsonPath('a_plus', true);
+    }
+
+    public function test_options_a_plus_est_faux_quand_tout_tient_dans_la_page(): void
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $this->creerDetenu(['nom' => 'Jean Dupont']);
+        }
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=Dupont');
+
+        $response->assertOk();
+        $response->assertJsonCount(5, 'data');
+        $response->assertJsonPath('a_plus', false);
+    }
+
+    public function test_options_decalage_renvoie_la_page_suivante(): void
+    {
+        // Noms triés alphabétiquement pour prédire l'ordre : Det-00 avant Det-01, etc.
+        for ($i = 0; $i < 25; $i++) {
+            $this->creerDetenu(['nom' => sprintf('Det-%02d Dupont', $i)]);
+        }
+
+        $premierePage = $this->getJson('/api/v1/detenus/options?recherche=Dupont');
+        $deuxiemePage = $this->getJson('/api/v1/detenus/options?recherche=Dupont&decalage=20');
+
+        $premierePage->assertOk();
+        $premierePage->assertJsonCount(20, 'data');
+        $premierePage->assertJsonPath('a_plus', true);
+        $premierePage->assertJsonPath('data.0.nom', 'Det-00 Dupont');
+
+        $deuxiemePage->assertOk();
+        $deuxiemePage->assertJsonCount(5, 'data');
+        $deuxiemePage->assertJsonPath('a_plus', false);
+        $deuxiemePage->assertJsonPath('data.0.nom', 'Det-20 Dupont');
+
+        // Pas de doublon entre les deux pages
+        $idsPage1 = collect($premierePage->json('data'))->pluck('id');
+        $idsPage2 = collect($deuxiemePage->json('data'))->pluck('id');
+        $this->assertEmpty($idsPage1->intersect($idsPage2));
+    }
+
+    public function test_options_inclut_la_cellule_sans_requete_par_detenu(): void
+    {
+        $d = $this->creerDetenu(['nom' => 'Jean Dupont']);
+        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
+        AffectationCellule::create(['detenu_id' => $d->id, 'cellule_id' => $cellule->id, 'date_affectation' => now()]);
+        $this->creerDetenu(['nom' => 'Jean Dupont']);
+
+        $response = $this->getJson('/api/v1/detenus/options?recherche=Dupont');
 
         $response->assertOk();
         $response->assertJsonFragment(['cellule' => ['numero' => 'C1', 'bloc' => 'A']]);
@@ -249,10 +351,10 @@ class DetenuListingTest extends TestCase
 
     public function test_options_trie_par_nom(): void
     {
-        $this->creerDetenu(['nom' => 'Zoé Martin']);
-        $this->creerDetenu(['nom' => 'Amine Traoré']);
+        $this->creerDetenu(['numero_ecrou' => 'TRI-001', 'nom' => 'Zoé Martin']);
+        $this->creerDetenu(['numero_ecrou' => 'TRI-002', 'nom' => 'Amine Traoré']);
 
-        $response = $this->getJson('/api/v1/detenus/options');
+        $response = $this->getJson('/api/v1/detenus/options?recherche=TRI-00');
 
         $response->assertOk();
         $response->assertJsonPath('data.0.nom', 'Amine Traoré');
