@@ -136,9 +136,15 @@ class CelluleAssignmentTest extends TestCase
         $pageReduite->assertOk();
         $pageReduite->assertJsonCount(5, 'data');
 
-        $pageHorsBornes = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?per_page=50");
+        // Sous le plafond de 100 : les 12 détenus de la cellule tiennent sur une seule page.
+        $pageElargie = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?per_page=50");
+        $pageElargie->assertOk();
+        $pageElargie->assertJsonCount(12, 'data');
+
+        // Au-delà de 100 : toujours plafonné.
+        $pageHorsBornes = $this->getJson("/api/v1/cellules/{$cellule->id}/detenus?per_page=500");
         $pageHorsBornes->assertOk();
-        $pageHorsBornes->assertJsonCount(10, 'data');
+        $pageHorsBornes->assertJsonPath('meta.per_page', 100);
     }
 
     public function test_archive_globale_des_affectations(): void

@@ -29,6 +29,7 @@ class DetenuListResource extends JsonResource
             'motif_detention' => $mandat?->motif_detention,
             'type_mandat' => $mandat?->type_mandat,
             'categorie_penale' => $this->when($this->relationLoaded('mandasActifs'), fn () => $this->categorie_penale_calculee?->value),
+            'nombre_mandats_actifs' => $this->when($this->relationLoaded('mandasActifs'), fn () => $this->mandasActifs->count()),
             'cellule_actuelle' => $this->when(
                 $this->relationLoaded('affectationActive'),
                 fn () => $this->affectationActive ? [

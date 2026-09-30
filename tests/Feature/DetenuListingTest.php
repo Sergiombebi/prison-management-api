@@ -156,6 +156,58 @@ class DetenuListingTest extends TestCase
         $response->assertJsonPath('data.0.id', $seul->id);
     }
 
+    public function test_prevenu_reste_actif_meme_avec_lalerte_administrative_depassee(): void
+    {
+        // `date_expiration_mandat` n'est qu'une alerte à 6 mois : un prévenu ne sort jamais
+        // "automatiquement" parce qu'elle est dépassée, tant qu'aucune date de sortie réelle
+        // (date_sortie_detention_provisoire) n'a été renseignée.
+        $d = $this->creerDetenu();
+        $this->creerMandas($d, [
+            'type_statut_penal' => 'Détention provisoire',
+            'date_expiration_mandat' => now()->subDays(400)->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=prevenus');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $d->id);
+    }
+
+    public function test_condamne_sort_de_la_categorie_une_fois_sa_date_de_sortie_effective_passee(): void
+    {
+        $d = $this->creerDetenu();
+        $this->creerMandas($d, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_sortie_execution_peine' => now()->subDay()->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=condamnes');
+
+        $response->assertOk();
+        $response->assertJsonCount(0, 'data');
+    }
+
+    public function test_dpac_reste_correct_meme_si_lalerte_administrative_du_mandat_juge_est_depassee(): void
+    {
+        // Cas signalé : un mandat "Exécution de peine" jugé il y a longtemps a forcément une
+        // alerte à 6 mois dépassée, sans que ça le rende inactif. Avec un second mandat en
+        // détention provisoire, le détenu doit rester DPAC.
+        $d = $this->creerDetenu();
+        $this->creerMandas($d, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_expiration_mandat' => now()->subYear()->toDateString(),
+            'date_sortie_execution_peine' => now()->addYears(2)->toDateString(),
+        ]);
+        $this->creerMandas($d, ['type_statut_penal' => 'Détention provisoire']);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=dpac');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $d->id);
+    }
+
     public function test_mandat_courant_priorise_execution_de_peine_a_date_egale(): void
     {
         // Reproduit le cas signalé : deux mandats actifs incarcérés le même jour,
@@ -241,7 +293,7 @@ class DetenuListingTest extends TestCase
         $response->assertJsonPath('data.0.id', $sansCellule->id);
     }
 
-    public function test_per_page_est_toujours_borne_entre_1_et_10(): void
+    public function test_per_page_est_toujours_borne_entre_1_et_100(): void
     {
         for ($i = 0; $i < 15; $i++) {
             $detenu = $this->creerDetenu();
@@ -257,10 +309,17 @@ class DetenuListingTest extends TestCase
         $reduit->assertOk();
         $reduit->assertJsonCount(3, 'data');
 
-        $auDela = $this->getJson('/api/v1/detenus?per_page=50');
+        // Sous le plafond de 100 : la valeur demandée est bien appliquée (ex. écran avec
+        // 15 000 détenus, choix de 50 lignes par page).
+        $auDela = $this->getJson('/api/v1/detenus?per_page=13');
         $auDela->assertOk();
-        $auDela->assertJsonCount(10, 'data');
-        $auDela->assertJsonPath('meta.per_page', 10);
+        $auDela->assertJsonCount(13, 'data');
+        $auDela->assertJsonPath('meta.per_page', 13);
+
+        // Au-delà de 100 : plafonné, jamais de valeur arbitrairement grande.
+        $bienAuDela = $this->getJson('/api/v1/detenus?per_page=500');
+        $bienAuDela->assertOk();
+        $bienAuDela->assertJsonPath('meta.per_page', 100);
 
         $sousLeMinimum = $this->getJson('/api/v1/detenus?per_page=0');
         $sousLeMinimum->assertOk();

@@ -49,6 +49,7 @@ class SortieResource extends JsonResource
             'sortie_definitive' => $this->sortie_definitive,
 
             'date_reintegration' => $this->date_reintegration?->toDateString(),
+            'duree_evasion_jours' => $this->duree_evasion_jours,
             'lieu_reintegration' => $this->lieu_reintegration,
             'autorite_reintegration' => $this->autorite_reintegration,
             'observations_reintegration' => $this->observations_reintegration,

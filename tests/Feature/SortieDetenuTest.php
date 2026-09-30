@@ -387,6 +387,49 @@ class SortieDetenuTest extends TestCase
         $this->assertSame('Évasion', $sanction->typeSanction->libelle);
     }
 
+    public function test_duree_evasion_est_calculee_par_defaut_mais_modifiable(): void
+    {
+        $detenu = $this->creerDetenu();
+        $mandas = $this->creerMandas($detenu, ['date_expiration_mandat' => '2026-09-26']);
+        $celluleDisciplinaire = $this->creerCellule();
+
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", [
+            'date_sortie' => '2026-09-16',
+        ])->json('data.id');
+
+        // Sans le champ : calculée automatiquement (14 jours entre le 16 et le 30 septembre).
+        $auto = $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ]);
+        $auto->assertOk();
+        $auto->assertJsonPath('data.duree_evasion_jours', 14);
+        $this->assertSame('2026-10-10', $mandas->fresh()->date_expiration_mandat->toDateString());
+    }
+
+    public function test_duree_evasion_saisie_manuellement_remplace_le_calcul_automatique(): void
+    {
+        $detenu = $this->creerDetenu();
+        $mandas = $this->creerMandas($detenu, ['date_expiration_mandat' => '2026-09-26']);
+        $celluleDisciplinaire = $this->creerCellule();
+
+        $sortieId = $this->postJson("/api/v1/detenus/{$detenu->id}/sorties/evasion", [
+            'date_sortie' => '2026-09-16',
+        ])->json('data.id');
+
+        // L'agent corrige la durée réelle (20 jours au lieu des 14 calculés depuis les dates).
+        $reintegration = $this->postJson("/api/v1/sorties/{$sortieId}/reintegrer", [
+            'date_reintegration' => '2026-09-30',
+            'duree_evasion_jours' => 20,
+            'cellule_disciplinaire_id' => $celluleDisciplinaire->id,
+        ]);
+
+        $reintegration->assertOk();
+        $reintegration->assertJsonPath('data.duree_evasion_jours', 20);
+        // 10 jours restants au 16/09 + 20 jours de cavale saisis = échéance au 16/10
+        $this->assertSame('2026-10-16', $mandas->fresh()->date_expiration_mandat->toDateString());
+    }
+
     public function test_mandat_sans_echeance_rouvre_tel_quel_a_la_reintegration(): void
     {
         $detenu = $this->creerDetenu();

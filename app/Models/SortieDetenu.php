@@ -24,6 +24,7 @@ class SortieDetenu extends Model
         'cause',
         'observation',
         'date_reintegration',
+        'duree_evasion_jours',
         'lieu_reintegration',
         'autorite_reintegration',
         'observations_reintegration',

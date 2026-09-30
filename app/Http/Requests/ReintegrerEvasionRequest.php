@@ -18,6 +18,10 @@ class ReintegrerEvasionRequest extends FormRequest
     {
         return [
             'date_reintegration' => ['required', 'date'],
+            // Calculée côté client (date_reintegration - date de l'évasion), mais modifiable :
+            // c'est cette valeur qui est ajoutée à l'échéance de chaque mandat gelé. Facultative
+            // pour rester tolérant à un appel externe : à défaut, le service la recalcule lui-même.
+            'duree_evasion_jours' => ['nullable', 'integer', 'min:0'],
             'lieu_reintegration' => ['nullable', 'string', 'max:255'],
             'autorite_reintegration' => ['nullable', 'string', 'max:255'],
             'observations_reintegration' => ['nullable', 'string'],

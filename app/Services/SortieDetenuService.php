@@ -138,7 +138,13 @@ class SortieDetenuService
                 'updated_by' => $userId,
             ]);
 
-            $sortie->mandatsGeles()->get()->each(function (SortieMandatGele $gel) use ($data, $userId) {
+            // Par défaut, le temps réellement passé en cavale (date de reprise - date de
+            // l'évasion) ; modifiable par l'agent à la réintégration (ex. cavale à cheval
+            // sur une amnistie, erreur de saisie sur la date d'évasion...).
+            $dureeEvasion = $data['duree_evasion_jours']
+                ?? Carbon::parse($sortie->date_sortie)->diffInDays(Carbon::parse($data['date_reintegration']));
+
+            $sortie->mandatsGeles()->get()->each(function (SortieMandatGele $gel) use ($sortie, $dureeEvasion, $userId) {
                 $mandat = Mandas::find($gel->mandat_id);
                 if (! $mandat) {
                     return;
@@ -147,7 +153,7 @@ class SortieDetenuService
                 $mandat->update([
                     'est_actif' => true,
                     'date_expiration_mandat' => $gel->jours_restants !== null
-                        ? Carbon::parse($data['date_reintegration'])->addDays($gel->jours_restants)
+                        ? Carbon::parse($sortie->date_sortie)->addDays($gel->jours_restants)->addDays($dureeEvasion)
                         : $mandat->date_expiration_mandat,
                     'updated_by' => $userId,
                 ]);
@@ -183,6 +189,7 @@ class SortieDetenuService
 
             $sortie->update([
                 'date_reintegration' => $data['date_reintegration'],
+                'duree_evasion_jours' => $dureeEvasion,
                 'lieu_reintegration' => $data['lieu_reintegration'] ?? null,
                 'autorite_reintegration' => $data['autorite_reintegration'] ?? null,
                 'observations_reintegration' => $data['observations_reintegration'] ?? null,

@@ -26,7 +26,7 @@ class MandasController extends Controller
      */
     public function expires(Request $request)
     {
-        $parPage = max(1, min(20, (int) $request->query('per_page', 20)));
+        $parPage = max(1, min(100, (int) $request->query('per_page', 20)));
 
         $base = fn () => Mandas::query()
             ->where('est_actif', true)
