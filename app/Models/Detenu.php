@@ -206,12 +206,16 @@ class Detenu extends Model
 
         $types = $this->mandasActifs->pluck('type_statut_penal');
         $aExecution = $types->contains(TypeStatutPenal::ExecutionDePeine);
+        // Un mandat "déjà jugé" n'est pas seulement une exécution de peine : passer en appel
+        // suppose un premier jugement, passer en cassation suppose une décision d'appel. Seule
+        // la détention provisoire correspond à "pas encore jugé".
+        $aUnMandatDejaJuge = $types->contains(fn (TypeStatutPenal $t) => $t !== TypeStatutPenal::DetentionProvisoire);
 
         return match (true) {
-            $types->count() >= 2 && $aExecution => CategoriePenale::Dpac,
+            $types->count() >= 2 && $aUnMandatDejaJuge => CategoriePenale::Dpac,
             $types->count() === 1 && $aExecution => CategoriePenale::Condamnes,
-            $types->contains(TypeStatutPenal::Cassationnaire) && ! $aExecution => CategoriePenale::Cassationnaires,
-            $types->contains(TypeStatutPenal::Appellant) && ! $aExecution => CategoriePenale::Appellants,
+            $types->count() === 1 && $types->contains(TypeStatutPenal::Cassationnaire) => CategoriePenale::Cassationnaires,
+            $types->count() === 1 && $types->contains(TypeStatutPenal::Appellant) => CategoriePenale::Appellants,
             $types->every(fn (TypeStatutPenal $t) => $t === TypeStatutPenal::DetentionProvisoire) => CategoriePenale::Prevenus,
             default => null,
         };
@@ -291,41 +295,40 @@ class Detenu extends Model
     }
 
     /**
-     * Au moins un mandat actif "Appellant", et aucun mandat actif "Exécution de peine" en parallèle
-     * (sinon -> DPAC).
+     * Exactement un mandat actif, et c'est un "Appellant" (sinon, avec un second mandat actif
+     * déjà jugé -> DPAC).
      */
     public function scopeAppellants(Builder $query): Builder
     {
         return $query
             ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-                $q->where('type_statut_penal', TypeStatutPenal::Appellant->value);
-            })
-            ->whereDoesntHave('mandas', function (Builder $q) {
+            }, '=', 1)
+            ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-                $q->where('type_statut_penal', TypeStatutPenal::ExecutionDePeine->value);
+                $q->where('type_statut_penal', TypeStatutPenal::Appellant->value);
             });
     }
 
     /**
-     * Au moins un mandat actif "Cassationnaire", et aucun mandat actif "Exécution de peine" en parallèle
-     * (sinon -> DPAC).
+     * Exactement un mandat actif, et c'est un "Cassationnaire" (sinon, avec un second mandat
+     * actif déjà jugé -> DPAC).
      */
     public function scopeCassationnaires(Builder $query): Builder
     {
         return $query
             ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-                $q->where('type_statut_penal', TypeStatutPenal::Cassationnaire->value);
-            })
-            ->whereDoesntHave('mandas', function (Builder $q) {
+            }, '=', 1)
+            ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-                $q->where('type_statut_penal', TypeStatutPenal::ExecutionDePeine->value);
+                $q->where('type_statut_penal', TypeStatutPenal::Cassationnaire->value);
             });
     }
 
     /**
-     * Au moins 2 mandats actifs simultanés, dont au moins une "Exécution de peine".
+     * Au moins 2 mandats actifs simultanés, dont au moins un déjà jugé (exécution de peine,
+     * appel ou cassation — tout sauf la détention provisoire, qui elle n'a pas encore été jugée).
      */
     public function scopeDpac(Builder $query): Builder
     {
@@ -335,7 +338,7 @@ class Detenu extends Model
             }, '>=', 2)
             ->whereHas('mandas', function (Builder $q) {
                 self::whereMandatActif($q);
-                $q->where('type_statut_penal', TypeStatutPenal::ExecutionDePeine->value);
+                $q->where('type_statut_penal', '!=', TypeStatutPenal::DetentionProvisoire->value);
             });
     }
 

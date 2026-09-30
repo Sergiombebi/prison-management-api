@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\CategoriePenale;
+use App\Enums\TypeStatutPenal;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDetenuRequest;
 use App\Http\Requests\UpdateDetenuRequest;
@@ -12,6 +13,7 @@ use App\Http\Resources\DetenuResource;
 use App\Http\Resources\DossierMedicalResource;
 use App\Models\Cellule;
 use App\Models\Detenu;
+use App\Models\Mandas;
 use App\Services\CloudinaryUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -96,7 +98,65 @@ class DetenuController extends Controller
 
         $detenus = $query->latest('id')->paginate($this->perPage($request));
 
-        return DetenuListResource::collection($detenus);
+        return DetenuListResource::collection($detenus)
+            ->additional([
+                'meta' => $request->boolean('avec_stats') ? ['stats' => $this->calculerStats()] : [],
+            ]);
+    }
+
+    /**
+     * Agrégats pour l'aperçu du registre (hall d'accueil, `/detenus/apercu`) : toujours
+     * calculés sur l'ensemble des détenus présents, jamais dérivés d'un échantillon de la
+     * page courante ni des filtres de la requête - mêmes chiffres que le tableau de bord.
+     * L'échéance des mandats suit la même règle que `mandats_expires` du tableau de bord
+     * (voir DashboardController::calculer()) : seuls les mandats encore en détention
+     * provisoire comptent, l'alerte à 6 mois ne concernant plus un mandat déjà jugé.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculerStats(): array
+    {
+        $maintenant = now();
+        $presents = fn () => Detenu::where('est_present', true);
+
+        // Même base que `mandats_expires` du tableau de bord (DashboardController::calculer()) :
+        // uniquement les mandats encore en détention provisoire, l'alerte à 6 mois ne
+        // concernant plus un mandat déjà jugé.
+        $mandatsEnAlerte = fn () => Mandas::query()
+            ->where('est_actif', true)
+            ->where('type_statut_penal', TypeStatutPenal::DetentionProvisoire)
+            ->whereNotNull('date_expiration_mandat')
+            ->whereHas('detenu', fn ($q) => $q->where('est_present', true));
+
+        return [
+            'effectif' => $presents()->count(),
+            'entrees_30j' => Detenu::where('created_at', '>=', $maintenant->clone()->subDays(30))->count(),
+            'sans_cellule' => $presents()->sansCellule()->count(),
+            'par_categorie' => [
+                'Prevenu' => $presents()->prevenus()->count(),
+                'Condamne' => $presents()->condamnes()->count(),
+                'Appellant' => $presents()->appellants()->count(),
+                'Cassationnaire' => $presents()->cassationnaires()->count(),
+                'Dpac' => $presents()->dpac()->count(),
+            ],
+            // Total réel, jamais dérivé de la liste `echeances` ci-dessous qui est bornée à
+            // 20 : compter sur cette liste sous-estimerait le total dès qu'il y en a plus.
+            'mandats_expires' => $mandatsEnAlerte()
+                ->where('date_expiration_mandat', '<', $maintenant->toDateString())
+                ->count(),
+            'echeances' => $mandatsEnAlerte()
+                ->where('date_expiration_mandat', '<=', $maintenant->clone()->addDays(30)->toDateString())
+                ->with('detenu:id,numero_ecrou,nom')
+                ->orderBy('date_expiration_mandat')
+                ->limit(20)
+                ->get()
+                ->map(fn (Mandas $m) => [
+                    'detenu_id' => $m->detenu_id,
+                    'numero_ecrou' => $m->detenu->numero_ecrou,
+                    'nom' => $m->detenu->nom,
+                    'date_expiration_mandat' => $m->date_expiration_mandat->toDateString(),
+                ]),
+        ];
     }
 
     /**

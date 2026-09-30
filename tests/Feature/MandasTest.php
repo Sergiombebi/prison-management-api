@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Detenu;
+use App\Models\Mandas;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -279,5 +280,97 @@ class MandasTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.date_expiration_mandat', '2026-10-01');
+    }
+
+    private function creerMandasDirect(Detenu $detenu, array $attributes = []): Mandas
+    {
+        return Mandas::create(array_merge([
+            'detenu_id' => $detenu->id,
+            'type_statut_penal' => 'Détention provisoire',
+            'date_incarceration' => '2026-01-01',
+            'est_actif' => true,
+        ], $attributes));
+    }
+
+    public function test_expires_liste_les_mandats_en_detention_provisoire_depasses(): void
+    {
+        // Même règle que DashboardController::calculer() et DetenuController::calculerStats() :
+        // seul un mandat encore en détention provisoire attend l'alerte à 6 mois.
+        $enRetard = $this->creerDetenu();
+        $this->creerMandasDirect($enRetard, ['date_expiration_mandat' => now()->subDays(5)->toDateString()]);
+
+        $dejaJuge = $this->creerDetenu();
+        $this->creerMandasDirect($dejaJuge, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+        ]);
+
+        $pasEncoreExpire = $this->creerDetenu();
+        $this->creerMandasDirect($pasEncoreExpire, ['date_expiration_mandat' => now()->addDays(5)->toDateString()]);
+
+        $response = $this->getJson('/api/v1/mandas/expires');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.detenu_id', $enRetard->id);
+        $response->assertJsonPath('data.0.detenu.nom', $enRetard->nom);
+    }
+
+    public function test_expires_ignore_un_mandat_desactive(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->creerMandasDirect($detenu, [
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+            'est_actif' => false,
+        ]);
+
+        $response = $this->getJson('/api/v1/mandas/expires');
+
+        $response->assertOk();
+        $response->assertJsonCount(0, 'data');
+    }
+
+    public function test_expires_est_paginee_a_vingt_par_page(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $d = $this->creerDetenu();
+            $this->creerMandasDirect($d, ['date_expiration_mandat' => now()->subDays(5)->toDateString()]);
+        }
+
+        $premierePage = $this->getJson('/api/v1/mandas/expires');
+        $deuxiemePage = $this->getJson('/api/v1/mandas/expires?page=2');
+
+        $premierePage->assertOk();
+        $premierePage->assertJsonCount(20, 'data');
+        $premierePage->assertJsonPath('meta.total', 25);
+        $premierePage->assertJsonPath('meta.per_page', 20);
+
+        $deuxiemePage->assertOk();
+        $deuxiemePage->assertJsonCount(5, 'data');
+    }
+
+    public function test_expires_stats_portent_sur_le_total_pas_sur_la_page_courante(): void
+    {
+        // Deux mandats en retard pour le même détenu (deux affaires distinctes) + un
+        // troisième détenu, un seul des trois échu depuis plus de 30 jours.
+        $detenuA = $this->creerDetenu();
+        $this->creerMandasDirect($detenuA, [
+            'date_incarceration' => '2026-01-01',
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+        ]);
+        $this->creerMandasDirect($detenuA, [
+            'date_incarceration' => '2026-02-01',
+            'motif_detention' => 'Seconde affaire',
+            'date_expiration_mandat' => now()->subDays(40)->toDateString(),
+        ]);
+
+        $detenuB = $this->creerDetenu();
+        $this->creerMandasDirect($detenuB, ['date_expiration_mandat' => now()->subDays(5)->toDateString()]);
+
+        $response = $this->getJson('/api/v1/mandas/expires');
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.detenus_concernes', 2);
+        $response->assertJsonPath('meta.stats.echus_plus_30_jours', 1);
     }
 }

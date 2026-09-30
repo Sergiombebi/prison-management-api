@@ -106,6 +106,56 @@ class DetenuListingTest extends TestCase
         $response->assertJsonPath('data.0.id', $d->id);
     }
 
+    public function test_categorie_dpac_avec_appellant_et_detention_provisoire(): void
+    {
+        // Passer en appel suppose un premier jugement : un mandat "Appellant" est déjà jugé,
+        // au même titre qu'une exécution de peine. Cumulé à une seconde affaire encore en
+        // instruction, le détenu est DPAC même sans exécution de peine.
+        $d = $this->creerDetenu();
+        $this->creerMandas($d, ['type_statut_penal' => 'Appellant']);
+        $this->creerMandas($d, ['type_statut_penal' => 'Détention provisoire']);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=dpac');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $d->id);
+    }
+
+    public function test_categorie_dpac_avec_appellant_et_cassationnaire(): void
+    {
+        // Deux mandats déjà jugés en parallèle (appel + cassation), sans aucune exécution de
+        // peine : toujours DPAC, pas seulement "cassationnaires".
+        $d = $this->creerDetenu();
+        $this->creerMandas($d, ['type_statut_penal' => 'Appellant']);
+        $this->creerMandas($d, ['type_statut_penal' => 'Cassationnaire']);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=dpac');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $d->id);
+    }
+
+    public function test_categorie_appellants_exclut_un_detenu_avec_un_second_mandat_juge(): void
+    {
+        // Un seul mandat actif "Appellant" -> Appellants ; avec un second mandat actif déjà
+        // jugé en parallèle, ce détenu bascule en DPAC (test au-dessus) et ne doit plus
+        // apparaître ici.
+        $seul = $this->creerDetenu();
+        $this->creerMandas($seul, ['type_statut_penal' => 'Appellant']);
+
+        $avecDeux = $this->creerDetenu();
+        $this->creerMandas($avecDeux, ['type_statut_penal' => 'Appellant']);
+        $this->creerMandas($avecDeux, ['type_statut_penal' => 'Cassationnaire']);
+
+        $response = $this->getJson('/api/v1/detenus?categorie_penale=appellants');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $seul->id);
+    }
+
     public function test_mandat_courant_priorise_execution_de_peine_a_date_egale(): void
     {
         // Reproduit le cas signalé : deux mandats actifs incarcérés le même jour,
@@ -359,5 +409,81 @@ class DetenuListingTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.0.nom', 'Amine Traoré');
         $response->assertJsonPath('data.1.nom', 'Zoé Martin');
+    }
+
+    public function test_sans_avec_stats_aucun_stats_dans_le_meta(): void
+    {
+        $d = $this->creerDetenu();
+        $this->creerMandas($d);
+
+        $response = $this->getJson('/api/v1/detenus');
+
+        $response->assertOk();
+        $this->assertArrayNotHasKey('stats', $response->json('meta'));
+    }
+
+    public function test_avec_stats_renvoie_les_agregats_attendus(): void
+    {
+        $prevenu = $this->creerDetenu();
+        $this->creerMandas($prevenu, ['type_statut_penal' => 'Détention provisoire']);
+
+        $condamne = $this->creerDetenu();
+        $this->creerMandas($condamne, ['type_statut_penal' => 'Exécution de peine']);
+
+        $sansCellule = $this->creerDetenu();
+        $this->creerMandas($sansCellule, ['type_statut_penal' => 'Détention provisoire']);
+        $cellule = Cellule::create(['numero' => 'C1', 'bloc' => 'A', 'capacite_max' => 4]);
+        AffectationCellule::create(['detenu_id' => $condamne->id, 'cellule_id' => $cellule->id, 'date_affectation' => now()]);
+
+        $response = $this->getJson('/api/v1/detenus?avec_stats=1');
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.effectif', 3);
+        $response->assertJsonPath('meta.stats.sans_cellule', 2);
+        $response->assertJsonPath('meta.stats.par_categorie.Prevenu', 2);
+        $response->assertJsonPath('meta.stats.par_categorie.Condamne', 1);
+    }
+
+    public function test_avec_stats_echeances_suit_la_meme_regle_que_le_tableau_de_bord(): void
+    {
+        // Même règle que DashboardController::calculer() : l'alerte à 6 mois ne concerne
+        // qu'un mandat encore en détention provisoire, jamais un mandat déjà jugé.
+        $prevenuEnRetard = $this->creerDetenu();
+        $this->creerMandas($prevenuEnRetard, [
+            'type_statut_penal' => 'Détention provisoire',
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+        ]);
+
+        $condamneEnRetard = $this->creerDetenu();
+        $this->creerMandas($condamneEnRetard, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/detenus?avec_stats=1');
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.mandats_expires', 1);
+        $response->assertJsonCount(1, 'meta.stats.echeances');
+        $response->assertJsonPath('meta.stats.echeances.0.detenu_id', $prevenuEnRetard->id);
+    }
+
+    public function test_avec_stats_mandats_expires_nest_pas_borne_par_la_liste_echeances(): void
+    {
+        // `echeances` est bornée à 20 lignes ; `mandats_expires` doit rester le vrai total,
+        // pas `count(echeances)`.
+        for ($i = 0; $i < 25; $i++) {
+            $d = $this->creerDetenu();
+            $this->creerMandas($d, [
+                'type_statut_penal' => 'Détention provisoire',
+                'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+            ]);
+        }
+
+        $response = $this->getJson('/api/v1/detenus?avec_stats=1');
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.mandats_expires', 25);
+        $response->assertJsonCount(20, 'meta.stats.echeances');
     }
 }

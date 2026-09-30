@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\TypeSortieDetenu;
+use App\Enums\TypeStatutPenal;
 use App\Http\Controllers\Controller;
 use App\Models\AffectationCellule;
 use App\Models\Cellule;
@@ -63,8 +64,13 @@ class DashboardController extends Controller
             'effectif_mois_precedent' => $this->populationAuPlusTard($debutMoisCourant, $effectif),
             'visites_aujourdhui' => Visite::whereDate('date_visite', $maintenant->toDateString())->count(),
             'sorties_prevues_mois_prochain' => $this->filtrerLiberables($mandatsActifs, $debutMoisProchain, $finMoisProchain)->count(),
+            // L'alerte à 6 mois n'a de sens que pour un prévenu en détention provisoire : c'est
+            // le délai au terme duquel le procureur doit être relancé pour qu'il juge le détenu
+            // ou renouvelle le mandat. Un mandat déjà jugé (exécution de peine, appel,
+            // cassation) n'attend plus de jugement, donc cette alerte ne s'y applique plus.
             'mandats_expires' => Mandas::query()
                 ->where('est_actif', true)
+                ->where('type_statut_penal', TypeStatutPenal::DetentionProvisoire)
                 ->whereNotNull('date_expiration_mandat')
                 ->where('date_expiration_mandat', '<', $maintenant->toDateString())
                 ->count(),

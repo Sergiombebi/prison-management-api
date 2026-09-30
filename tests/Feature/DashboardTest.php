@@ -97,6 +97,23 @@ class DashboardTest extends TestCase
         $response->assertJsonPath('data.mandats_expires', 1);
     }
 
+    public function test_mandats_expires_ignore_un_mandat_deja_juge(): void
+    {
+        // L'alerte à 6 mois relance le procureur tant que le détenu n'est pas jugé : une fois
+        // le mandat passé en exécution de peine (ou appel/cassation), elle ne s'applique plus,
+        // même si `date_expiration_mandat` (fixée à la signature) est dans le passé.
+        $detenu = $this->creerDetenu();
+        $this->creerMandas($detenu, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_expiration_mandat' => now()->subDays(5)->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/tableau-de-bord');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.mandats_expires', 0);
+    }
+
     public function test_liberables_ce_mois_et_sorties_prevues_mois_prochain(): void
     {
         // La date de sortie EFFECTIVE (calculée, jamais l'alerte date_expiration_mandat)
