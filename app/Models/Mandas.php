@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TypeStatutPenal;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -114,6 +115,36 @@ class Mandas extends Model
     // est très postérieure à l'autre). Utiliser ce champ comme repère produirait une alerte
     // trompeuse sur un délai légal ; à ajouter proprement (nouveau champ dédié) avec le
     // développeur backend plutôt que d'improviser un proxy incorrect.
+
+    /**
+     * Mandats "actifs" : non désactivés, dont la vraie date de sortie n'est pas encore
+     * passée - jamais `date_expiration_mandat`, qui n'est qu'une alerte administrative à
+     * 6 mois et ne reflète la sortie réelle pour aucun statut. Traduit en SQL la même
+     * cascade que `getDateSortieEffectiveAttribute()` (inutilisable dans un WHERE, c'est
+     * un accesseur PHP). Partagé par `Detenu::whereMandatActif()` et
+     * `MandasController::index()` : une seule définition de "actif" dans toute l'API.
+     */
+    public function scopeActif(Builder $query): Builder
+    {
+        return $query->where('est_actif', true)->where(function (Builder $q) {
+            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::DetentionProvisoire, 'date_sortie_detention_provisoire');
+            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::ExecutionDePeine, 'date_sortie_execution_peine');
+            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::Appellant, 'COALESCE(date_sortie_appel, date_sortie_execution_peine)');
+            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::Cassationnaire, 'COALESCE(date_sortie_cassation, date_sortie_appel, date_sortie_execution_peine)');
+        });
+    }
+
+    /** Une branche de la disjonction ci-dessus : ce statut, avec sa date de sortie non dépassée. */
+    private static function whereDateSortieEffectiveOuverte(Builder $q, TypeStatutPenal $type, string $expression): void
+    {
+        $q->orWhere(function (Builder $q2) use ($type, $expression) {
+            $q2->where('type_statut_penal', $type->value)
+                ->where(function (Builder $q3) use ($expression) {
+                    $q3->whereRaw("{$expression} IS NULL")
+                        ->orWhereRaw("{$expression} > ?", [now()->toDateTimeString()]);
+                });
+        });
+    }
 
     public function detenu(): BelongsTo
     {

@@ -189,4 +189,104 @@ class PrescriptionTest extends TestCase
         $parDetenu->assertOk();
         $parDetenu->assertJsonCount(1, 'data');
     }
+
+    public function test_la_liste_globale_est_paginee(): void
+    {
+        $detenu = $this->creerDetenu();
+        for ($i = 0; $i < 12; $i++) {
+            $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+                'medicament' => 'Paracétamol',
+                'posologie' => '500mg',
+                'date_debut' => '2026-09-20',
+                'prescripteur' => 'Dr Ekotto',
+            ])->assertCreated();
+        }
+
+        $globale = $this->getJson('/api/v1/prescriptions');
+        $globale->assertOk();
+        $globale->assertJsonCount(10, 'data');
+        $globale->assertJsonPath('meta.total', 12);
+    }
+
+    public function test_recherche_par_medicament_nom_ou_numero_ecrou(): void
+    {
+        $d1 = $this->creerDetenu(['nom' => 'Paul Biya', 'numero_ecrou' => 'ECR-11111']);
+        $d2 = $this->creerDetenu(['nom' => 'Autre Personne', 'numero_ecrou' => 'ECR-22222']);
+        $this->postJson("/api/v1/detenus/{$d1->id}/prescriptions", [
+            'medicament' => 'Paracétamol', 'posologie' => '500mg', 'date_debut' => '2026-09-20', 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+        $this->postJson("/api/v1/detenus/{$d2->id}/prescriptions", [
+            'medicament' => 'Ibuprofène', 'posologie' => '400mg', 'date_debut' => '2026-09-21', 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+
+        $parNom = $this->getJson('/api/v1/prescriptions?search=Biya');
+        $parNom->assertOk();
+        $parNom->assertJsonCount(1, 'data');
+
+        $parEcrou = $this->getJson('/api/v1/prescriptions?search=ECR-22222');
+        $parEcrou->assertOk();
+        $parEcrou->assertJsonCount(1, 'data');
+
+        $parMedicament = $this->getJson('/api/v1/prescriptions?search=Ibuprofène');
+        $parMedicament->assertOk();
+        $parMedicament->assertJsonCount(1, 'data');
+        $parMedicament->assertJsonPath('data.0.detenu.id', $d2->id);
+    }
+
+    public function test_filtre_par_statut(): void
+    {
+        $detenu = $this->creerDetenu();
+        $enCoursId = $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Paracétamol', 'posologie' => '500mg', 'date_debut' => '2026-09-01', 'prescripteur' => 'Dr Ekotto',
+        ])->json('data.id');
+        $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Amoxicilline', 'posologie' => '1g', 'date_debut' => '2026-08-01', 'date_fin' => '2026-08-10', 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+        $arreteId = $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Ibuprofène', 'posologie' => '400mg', 'date_debut' => '2026-09-10', 'prescripteur' => 'Dr Ekotto',
+        ])->json('data.id');
+        $this->postJson("/api/v1/prescriptions/{$arreteId}/arreter", ['arrete_le' => '2026-09-12'])->assertOk();
+
+        $enCours = $this->getJson('/api/v1/prescriptions?statut=en_cours');
+        $enCours->assertOk();
+        $enCours->assertJsonCount(1, 'data');
+        $enCours->assertJsonPath('data.0.id', $enCoursId);
+
+        $termine = $this->getJson('/api/v1/prescriptions?statut=termine');
+        $termine->assertOk();
+        $termine->assertJsonCount(1, 'data');
+
+        $arrete = $this->getJson('/api/v1/prescriptions?statut=arrete');
+        $arrete->assertOk();
+        $arrete->assertJsonCount(1, 'data');
+        $arrete->assertJsonPath('data.0.id', $arreteId);
+
+        $this->getJson('/api/v1/prescriptions?statut=invalide')->assertStatus(422);
+    }
+
+    public function test_avec_stats_calcule_sur_lensemble_du_registre(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Paracétamol', 'posologie' => '500mg', 'date_debut' => '2026-09-01', 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Amoxicilline', 'posologie' => '1g', 'date_debut' => now()->toDateString(),
+            'date_fin' => now()->addDays(2)->toDateString(), 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
+            'medicament' => 'Ibuprofène', 'posologie' => '400mg', 'date_debut' => '2026-08-01',
+            'date_fin' => '2026-08-10', 'prescripteur' => 'Dr Ekotto',
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/prescriptions?per_page=1&avec_stats=1');
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.total', 3);
+        $response->assertJsonPath('meta.stats.en_cours', 2);
+        $response->assertJsonPath('meta.stats.a_renouveler', 1);
+
+        $sansStats = $this->getJson('/api/v1/prescriptions');
+        $sansStats->assertOk();
+        $sansStats->assertJsonMissingPath('meta.stats');
+    }
 }

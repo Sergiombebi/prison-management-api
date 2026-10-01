@@ -249,33 +249,13 @@ class Detenu extends Model
     }
 
     /**
-     * Un mandat "actif" est un mandat non désactivé dont la vraie date de sortie n'est pas
-     * encore passée - jamais `date_expiration_mandat`, qui n'est qu'une alerte administrative
-     * à 6 mois (relance du procureur tant que le détenu n'est pas jugé) et ne reflète la
-     * sortie réelle pour aucun statut, pas même la détention provisoire. Traduit en SQL la
-     * même cascade que Mandas::getDateSortieEffectiveAttribute() (inutilisable ici, c'est un
-     * accesseur PHP) : par statut, la colonne date_sortie_* correspondante.
+     * Un mandat "actif" : voir Mandas::scopeActif(), seule définition dans toute l'API -
+     * partagée avec MandasController::index(). `$query` est toujours un query builder de
+     * Mandas ici (relation mandasActifs(), whereHas('mandas', ...), ou Mandas::query()).
      */
     private static function whereMandatActif(Builder $query): void
     {
-        $query->where('est_actif', true)->where(function (Builder $q) {
-            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::DetentionProvisoire, 'date_sortie_detention_provisoire');
-            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::ExecutionDePeine, 'date_sortie_execution_peine');
-            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::Appellant, 'COALESCE(date_sortie_appel, date_sortie_execution_peine)');
-            self::whereDateSortieEffectiveOuverte($q, TypeStatutPenal::Cassationnaire, 'COALESCE(date_sortie_cassation, date_sortie_appel, date_sortie_execution_peine)');
-        });
-    }
-
-    /** Une branche de la disjonction ci-dessus : ce statut, avec sa date de sortie non dépassée. */
-    private static function whereDateSortieEffectiveOuverte(Builder $q, TypeStatutPenal $type, string $expression): void
-    {
-        $q->orWhere(function (Builder $q2) use ($type, $expression) {
-            $q2->where('type_statut_penal', $type->value)
-                ->where(function (Builder $q3) use ($expression) {
-                    $q3->whereRaw("{$expression} IS NULL")
-                        ->orWhereRaw("{$expression} > ?", [now()->toDateTimeString()]);
-                });
-        });
+        $query->actif();
     }
 
     /**

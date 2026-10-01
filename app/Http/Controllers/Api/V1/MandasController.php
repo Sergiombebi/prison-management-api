@@ -11,10 +11,62 @@ use App\Models\Detenu;
 use App\Models\Mandas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class MandasController extends Controller
 {
     private const RELATIONS = ['createdBy', 'updatedBy', 'detenu'];
+
+    /**
+     * Registre de tous les mandats, tous détenus confondus - recherche par détenu/écrou/
+     * référence, filtre par statut pénal et par état (actif au sens de Mandas::scopeActif(),
+     * jamais `date_expiration_mandat`). Paginé à 20 par page.
+     */
+    public function index(Request $request)
+    {
+        $parPage = max(1, min(100, (int) $request->query('per_page', 20)));
+
+        $query = Mandas::query()->with(self::RELATIONS);
+
+        if ($request->filled('recherche')) {
+            $terme = $request->query('recherche');
+            $query->where(function ($q) use ($terme) {
+                $q->where('reference_mandat', 'like', "%{$terme}%")
+                    ->orWhereHas('detenu', function ($q2) use ($terme) {
+                        $q2->where('nom', 'like', "%{$terme}%")
+                            ->orWhere('numero_ecrou', 'like', "%{$terme}%");
+                    });
+            });
+        }
+
+        if ($request->filled('statut')) {
+            $statut = $request->query('statut');
+            $valeurs = array_column(TypeStatutPenal::cases(), 'value');
+
+            if (! in_array($statut, $valeurs, true)) {
+                throw ValidationException::withMessages([
+                    'statut' => ['Statut pénal invalide. Valeurs acceptées : '.implode(', ', $valeurs).'.'],
+                ]);
+            }
+
+            $query->where('type_statut_penal', $statut);
+        }
+
+        $etat = $request->query('etat');
+        if ($etat === 'actifs') {
+            $query->actif();
+        } elseif ($etat === 'expires') {
+            $query->whereNot(fn ($q) => $q->actif());
+        } elseif ($etat !== null && $etat !== 'tous') {
+            throw ValidationException::withMessages([
+                'etat' => ["L'état doit être : actifs, expires ou tous."],
+            ]);
+        }
+
+        $mandats = $query->orderByDesc('date_incarceration')->paginate($parPage);
+
+        return MandasResource::collection($mandats);
+    }
 
     /**
      * Mandats à régulariser : encore en détention provisoire, alerte à 6 mois déjà dépassée

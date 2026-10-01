@@ -53,6 +53,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:detenus.mandats.gerer')->group(function () {
             Route::post('/detenus/photos', [DetenuPhotoController::class, 'store']);
             Route::post('/detenus/{detenu}/mandas', [MandasController::class, 'store']);
+            Route::get('/mandas', [MandasController::class, 'index']);
             // Avant /mandas/{mandas}, même piège que /detenus/options plus haut.
             Route::get('/mandas/expires', [MandasController::class, 'expires']);
             Route::get('/mandas/{mandas}', [MandasController::class, 'show']);

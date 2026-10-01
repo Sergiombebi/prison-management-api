@@ -114,7 +114,7 @@ class SuiviMedicalTest extends TestCase
         $parDetenu->assertJsonCount(1, 'data');
     }
 
-    public function test_les_listes_ne_sont_pas_paginees(): void
+    public function test_la_liste_globale_est_paginee_mais_pas_celle_dun_detenu(): void
     {
         $detenu = $this->creerDetenu();
         for ($i = 0; $i < 12; $i++) {
@@ -123,12 +123,74 @@ class SuiviMedicalTest extends TestCase
 
         $globale = $this->getJson('/api/v1/suivis-medicaux');
         $globale->assertOk();
-        $globale->assertJsonCount(12, 'data');
-        $globale->assertJsonMissingPath('meta');
+        $globale->assertJsonCount(10, 'data');
+        $globale->assertJsonPath('meta.total', 12);
 
+        // Le dossier médical d'un détenu se consulte toujours en entier : un praticien ne
+        // doit jamais avoir à paginer l'historique d'une seule personne.
         $parDetenu = $this->getJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux");
         $parDetenu->assertOk();
         $parDetenu->assertJsonCount(12, 'data');
         $parDetenu->assertJsonMissingPath('meta');
+    }
+
+    public function test_recherche_par_diagnostic_nom_ou_numero_ecrou(): void
+    {
+        $d1 = $this->creerDetenu(['nom' => 'Paul Biya', 'numero_ecrou' => 'ECR-11111']);
+        $d2 = $this->creerDetenu(['nom' => 'Autre Personne', 'numero_ecrou' => 'ECR-22222']);
+        $this->postJson("/api/v1/detenus/{$d1->id}/suivis-medicaux", array_merge($this->corpsValide(), ['diagnostic' => 'Grippe']))->assertCreated();
+        $this->postJson("/api/v1/detenus/{$d2->id}/suivis-medicaux", array_merge($this->corpsValide(), ['diagnostic' => 'Fracture']))->assertCreated();
+
+        $parNom = $this->getJson('/api/v1/suivis-medicaux?search=Biya');
+        $parNom->assertOk();
+        $parNom->assertJsonCount(1, 'data');
+
+        $parEcrou = $this->getJson('/api/v1/suivis-medicaux?search=ECR-22222');
+        $parEcrou->assertOk();
+        $parEcrou->assertJsonCount(1, 'data');
+
+        $parDiagnostic = $this->getJson('/api/v1/suivis-medicaux?search=Fracture');
+        $parDiagnostic->assertOk();
+        $parDiagnostic->assertJsonCount(1, 'data');
+        $parDiagnostic->assertJsonPath('data.0.detenu.id', $d2->id);
+    }
+
+    public function test_filtre_par_type_consultation(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux", array_merge($this->corpsValide(), ['type_consultation' => 'Urgence']))->assertCreated();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux", array_merge($this->corpsValide(), ['type_consultation' => 'Consultation générale']))->assertCreated();
+
+        $response = $this->getJson('/api/v1/suivis-medicaux?type_consultation=Urgence');
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.type_consultation', 'Urgence');
+    }
+
+    public function test_avec_stats_calcule_sur_lensemble_du_registre(): void
+    {
+        $detenu = $this->creerDetenu();
+        for ($i = 0; $i < 3; $i++) {
+            $this->postJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux", $this->corpsValide())->assertCreated();
+        }
+        $this->postJson("/api/v1/detenus/{$detenu->id}/suivis-medicaux", array_merge(
+            $this->corpsValide(),
+            [
+                'type_consultation' => 'Urgence',
+                'date_consultation' => now()->toDateString(),
+                'date_suivi' => now()->addDays(3)->toDateString(),
+            ],
+        ))->assertCreated();
+
+        $response = $this->getJson('/api/v1/suivis-medicaux?per_page=2&avec_stats=1');
+        $response->assertOk();
+        // Les stats portent sur les 4 consultations créées, pas sur les 2 de la page
+        // courante.
+        $response->assertJsonPath('meta.stats.total', 4);
+        $response->assertJsonPath('meta.stats.urgences_7j', 1);
+
+        $sansStats = $this->getJson('/api/v1/suivis-medicaux');
+        $sansStats->assertOk();
+        $sansStats->assertJsonMissingPath('meta.stats');
     }
 }

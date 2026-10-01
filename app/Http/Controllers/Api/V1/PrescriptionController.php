@@ -8,25 +8,97 @@ use App\Http\Requests\StorePrescriptionRequest;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Detenu;
 use App\Models\Prescription;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 class PrescriptionController extends Controller
 {
     private const RELATIONS = ['createdBy', 'updatedBy'];
 
     /**
-     * Liste globale des prescriptions, tous détenus confondus, la plus récente
-     * d'abord. Non paginée : comme les autres registres médicaux, elle se consulte
-     * en entier.
+     * Registre global des prescriptions, tous détenus confondus - recherche par détenu/
+     * écrou/médicament, filtre par statut (calculé, voir Prescription::getStatutAttribute()
+     * - pas une colonne), paginé.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $prescriptions = Prescription::query()
-            ->with([...self::RELATIONS, 'detenu'])
-            ->orderByDesc('date_debut')
-            ->orderByDesc('id')
-            ->get();
+        $query = Prescription::query()->with([...self::RELATIONS, 'detenu']);
 
-        return PrescriptionResource::collection($prescriptions);
+        if ($request->filled('search')) {
+            $terme = $request->query('search');
+            $query->where(function ($q) use ($terme) {
+                $q->where('medicament', 'like', "%{$terme}%")
+                    ->orWhereHas('detenu', function ($q2) use ($terme) {
+                        $q2->where('nom', 'like', "%{$terme}%")
+                            ->orWhere('numero_ecrou', 'like', "%{$terme}%");
+                    });
+            });
+        }
+
+        if ($request->filled('statut')) {
+            $statut = $request->query('statut');
+            match ($statut) {
+                'arrete' => $query->whereNotNull('arrete_le'),
+                'termine' => $this->whereTermine($query),
+                'en_cours' => $this->whereEnCours($query),
+                default => abort(response()->json(['message' => "Statut invalide : {$statut}."], 422)),
+            };
+        }
+
+        $prescriptions = $query->orderByDesc('date_debut')->orderByDesc('id')->paginate($this->perPage($request));
+
+        return PrescriptionResource::collection($prescriptions)->additional([
+            'meta' => $request->boolean('avec_stats') ? ['stats' => $this->calculerStats()] : [],
+        ]);
+    }
+
+    /**
+     * Un traitement est « terminé » quand sa date de fin est passée sans arrêt anticipé.
+     */
+    private function whereTermine(Builder $query): void
+    {
+        $query->whereNull('arrete_le')
+            ->whereNotNull('date_fin')
+            ->where('date_fin', '<', now()->startOfDay());
+    }
+
+    /**
+     * En cours : ni arrêté, ni terminé.
+     */
+    private function whereEnCours(Builder $query): void
+    {
+        $query->whereNull('arrete_le')
+            ->where(function (Builder $q) {
+                $q->whereNull('date_fin')->orWhere('date_fin', '>=', now()->startOfDay());
+            });
+    }
+
+    /**
+     * Agrégats pour l'aperçu du module : toujours calculés sur l'ensemble du registre,
+     * jamais sur la page ou les filtres courants.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculerStats(): array
+    {
+        $total = Prescription::count();
+
+        $enCoursQuery = Prescription::query();
+        $this->whereEnCours($enCoursQuery);
+        $enCours = $enCoursQuery->count();
+
+        $aRenouvelerQuery = Prescription::query();
+        $this->whereEnCours($aRenouvelerQuery);
+        $aRenouveler = $aRenouvelerQuery
+            ->whereNotNull('date_fin')
+            ->whereBetween('date_fin', [now()->startOfDay(), now()->addDays(3)->endOfDay()])
+            ->count();
+
+        return [
+            'total' => $total,
+            'en_cours' => $enCours,
+            'a_renouveler' => $aRenouveler,
+        ];
     }
 
     /**

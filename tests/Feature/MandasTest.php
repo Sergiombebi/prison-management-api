@@ -373,4 +373,86 @@ class MandasTest extends TestCase
         $response->assertJsonPath('meta.stats.detenus_concernes', 2);
         $response->assertJsonPath('meta.stats.echus_plus_30_jours', 1);
     }
+
+    public function test_index_liste_tous_les_mandats_paginee_a_vingt_par_page(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $this->creerMandasDirect($this->creerDetenu());
+        }
+
+        $premierePage = $this->getJson('/api/v1/mandas');
+        $premierePage->assertOk();
+        $premierePage->assertJsonCount(20, 'data');
+        $premierePage->assertJsonPath('meta.total', 25);
+        $premierePage->assertJsonPath('meta.per_page', 20);
+
+        $deuxiemePage = $this->getJson('/api/v1/mandas?page=2');
+        $deuxiemePage->assertOk();
+        $deuxiemePage->assertJsonCount(5, 'data');
+    }
+
+    public function test_index_recherche_par_nom_numero_ecrou_ou_reference(): void
+    {
+        $d1 = $this->creerDetenu(['nom' => 'Ateba Sylvain', 'numero_ecrou' => 'ECR-RECH-1']);
+        $this->creerMandasDirect($d1, ['reference_mandat' => 'MDP-RECH-1']);
+        $d2 = $this->creerDetenu(['nom' => 'Autre Personne', 'numero_ecrou' => 'ECR-AUTRE']);
+        $this->creerMandasDirect($d2, ['reference_mandat' => 'MDP-AUTRE']);
+
+        $parNom = $this->getJson('/api/v1/mandas?recherche=Ateba');
+        $parNom->assertOk();
+        $parNom->assertJsonCount(1, 'data');
+        $parNom->assertJsonPath('data.0.detenu.id', $d1->id);
+
+        $parEcrou = $this->getJson('/api/v1/mandas?recherche=ECR-RECH-1');
+        $parEcrou->assertJsonCount(1, 'data');
+
+        $parReference = $this->getJson('/api/v1/mandas?recherche=MDP-RECH-1');
+        $parReference->assertJsonCount(1, 'data');
+    }
+
+    public function test_index_filtre_par_statut_penal(): void
+    {
+        $this->creerMandasDirect($this->creerDetenu(), ['type_statut_penal' => 'Détention provisoire']);
+        $this->creerMandasDirect($this->creerDetenu(), ['type_statut_penal' => 'Exécution de peine']);
+
+        $response = $this->getJson('/api/v1/mandas?statut='.urlencode('Exécution de peine'));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.type_statut_penal', 'Exécution de peine');
+    }
+
+    public function test_index_statut_invalide_rejete(): void
+    {
+        $this->getJson('/api/v1/mandas?statut=invalide')->assertStatus(422);
+    }
+
+    public function test_index_filtre_par_etat_actif_ou_expire(): void
+    {
+        $actif = $this->creerDetenu();
+        $this->creerMandasDirect($actif, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_sortie_execution_peine' => now()->addYear()->toDateString(),
+        ]);
+        $expire = $this->creerDetenu();
+        $this->creerMandasDirect($expire, [
+            'type_statut_penal' => 'Exécution de peine',
+            'date_sortie_execution_peine' => now()->subDay()->toDateString(),
+        ]);
+
+        $actifs = $this->getJson('/api/v1/mandas?etat=actifs');
+        $actifs->assertOk();
+        $actifs->assertJsonCount(1, 'data');
+        $actifs->assertJsonPath('data.0.detenu_id', $actif->id);
+
+        $expires = $this->getJson('/api/v1/mandas?etat=expires');
+        $expires->assertOk();
+        $expires->assertJsonCount(1, 'data');
+        $expires->assertJsonPath('data.0.detenu_id', $expire->id);
+    }
+
+    public function test_index_etat_invalide_rejete(): void
+    {
+        $this->getJson('/api/v1/mandas?etat=invalide')->assertStatus(422);
+    }
 }

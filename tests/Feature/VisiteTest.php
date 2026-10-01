@@ -152,4 +152,87 @@ class VisiteTest extends TestCase
 
         $response->assertNotFound();
     }
+
+    public function test_la_liste_globale_est_paginee(): void
+    {
+        $detenu = $this->creerDetenu();
+        for ($i = 0; $i < 12; $i++) {
+            $this->postJson("/api/v1/detenus/{$detenu->id}/visites", $this->corpsValide())->assertCreated();
+        }
+
+        $globale = $this->getJson('/api/v1/visites');
+        $globale->assertOk();
+        $globale->assertJsonCount(10, 'data');
+        $globale->assertJsonPath('meta.total', 12);
+    }
+
+    public function test_recherche_par_visiteur_nom_ou_numero_ecrou(): void
+    {
+        $d1 = $this->creerDetenu(['nom' => 'Paul Biya', 'numero_ecrou' => 'ECR-11111']);
+        $d2 = $this->creerDetenu(['nom' => 'Autre Personne', 'numero_ecrou' => 'ECR-22222']);
+        $this->postJson("/api/v1/detenus/{$d1->id}/visites", array_merge($this->corpsValide(), ['nom_visiteur' => 'Alice Dupont']))->assertCreated();
+        $this->postJson("/api/v1/detenus/{$d2->id}/visites", array_merge($this->corpsValide(), ['nom_visiteur' => 'Bernard Kamga']))->assertCreated();
+
+        $parNomDetenu = $this->getJson('/api/v1/visites?search=Biya');
+        $parNomDetenu->assertOk();
+        $parNomDetenu->assertJsonCount(1, 'data');
+
+        $parEcrou = $this->getJson('/api/v1/visites?search=ECR-22222');
+        $parEcrou->assertOk();
+        $parEcrou->assertJsonCount(1, 'data');
+
+        $parVisiteur = $this->getJson('/api/v1/visites?search=Kamga');
+        $parVisiteur->assertOk();
+        $parVisiteur->assertJsonCount(1, 'data');
+        $parVisiteur->assertJsonPath('data.0.detenu.id', $d2->id);
+    }
+
+    public function test_filtre_par_type_visite(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/visites", array_merge($this->corpsValide(), ['type_visite' => 'Parloir avocat']))->assertCreated();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/visites", array_merge($this->corpsValide(), ['type_visite' => 'Parloir familial']))->assertCreated();
+
+        $response = $this->getJson('/api/v1/visites?type_visite=Parloir avocat');
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.type_visite', 'Parloir avocat');
+    }
+
+    public function test_filtre_par_periode(): void
+    {
+        $detenu = $this->creerDetenu();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/visites", array_merge($this->corpsValide(), ['date_visite' => now()->toDateString()]))->assertCreated();
+        $this->postJson("/api/v1/detenus/{$detenu->id}/visites", array_merge($this->corpsValide(), ['date_visite' => now()->subDays(20)->toDateString()]))->assertCreated();
+
+        $duJour = $this->getJson('/api/v1/visites?periode=aujourdhui');
+        $duJour->assertOk();
+        $duJour->assertJsonCount(1, 'data');
+
+        $semaine = $this->getJson('/api/v1/visites?periode=semaine');
+        $semaine->assertOk();
+        $semaine->assertJsonCount(1, 'data');
+    }
+
+    public function test_avec_stats_calcule_sur_lensemble_du_registre(): void
+    {
+        $detenu = $this->creerDetenu();
+        for ($i = 0; $i < 3; $i++) {
+            $this->postJson("/api/v1/detenus/{$detenu->id}/visites", $this->corpsValide())->assertCreated();
+        }
+        $this->postJson("/api/v1/detenus/{$detenu->id}/visites", array_merge(
+            $this->corpsValide(),
+            ['date_visite' => now()->toDateString(), 'autorisation_prealable' => false],
+        ))->assertCreated();
+
+        $response = $this->getJson('/api/v1/visites?per_page=2&avec_stats=1');
+        $response->assertOk();
+        $response->assertJsonPath('meta.stats.total', 4);
+        $response->assertJsonPath('meta.stats.du_jour', 1);
+        $response->assertJsonPath('meta.stats.sans_autorisation', 1);
+
+        $sansStats = $this->getJson('/api/v1/visites');
+        $sansStats->assertOk();
+        $sansStats->assertJsonMissingPath('meta.stats');
+    }
 }

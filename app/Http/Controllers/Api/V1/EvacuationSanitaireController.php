@@ -8,6 +8,7 @@ use App\Http\Requests\StoreRetourEvacuationRequest;
 use App\Http\Resources\EvacuationSanitaireResource;
 use App\Models\Detenu;
 use App\Models\EvacuationSanitaire;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EvacuationSanitaireController extends Controller
@@ -15,19 +16,54 @@ class EvacuationSanitaireController extends Controller
     private const RELATIONS = ['createdBy', 'updatedBy'];
 
     /**
-     * Liste globale des évacuations sanitaires, tous détenus confondus, la plus
-     * récente d'abord. Non paginée : comme le registre des visites, elle se
-     * consulte en entier.
+     * Registre global des évacuations sanitaires, tous détenus confondus - recherche par
+     * détenu/écrou/structure, filtre par statut (« en-cours » = pas encore de retour
+     * enregistré, « rentre » = retour enregistré), paginé.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $evacuations = EvacuationSanitaire::query()
-            ->with([...self::RELATIONS, 'detenu'])
-            ->orderByDesc('date_depart')
-            ->orderByDesc('id')
-            ->get();
+        $query = EvacuationSanitaire::query()->with([...self::RELATIONS, 'detenu']);
 
-        return EvacuationSanitaireResource::collection($evacuations);
+        if ($request->filled('search')) {
+            $terme = $request->query('search');
+            $query->where(function ($q) use ($terme) {
+                $q->where('structure_destination', 'like', "%{$terme}%")
+                    ->orWhereHas('detenu', function ($q2) use ($terme) {
+                        $q2->where('nom', 'like', "%{$terme}%")
+                            ->orWhere('numero_ecrou', 'like', "%{$terme}%");
+                    });
+            });
+        }
+
+        if ($request->filled('statut')) {
+            $statut = $request->query('statut');
+            match ($statut) {
+                'en-cours' => $query->whereNull('date_retour'),
+                'rentre' => $query->whereNotNull('date_retour'),
+                default => abort(response()->json(['message' => "Statut invalide : {$statut}."], 422)),
+            };
+        }
+
+        $evacuations = $query->orderByDesc('date_depart')->orderByDesc('id')->paginate($this->perPage($request));
+
+        return EvacuationSanitaireResource::collection($evacuations)->additional([
+            'meta' => $request->boolean('avec_stats') ? ['stats' => $this->calculerStats()] : [],
+        ]);
+    }
+
+    /**
+     * Agrégats pour l'aperçu du module : toujours calculés sur l'ensemble du registre,
+     * jamais sur la page ou les filtres courants.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculerStats(): array
+    {
+        return [
+            'total' => EvacuationSanitaire::count(),
+            'en_cours' => EvacuationSanitaire::whereNull('date_retour')->count(),
+            'trente_jours' => EvacuationSanitaire::where('date_depart', '>=', now()->subDays(30)->toDateString())->count(),
+        ];
     }
 
     /**
