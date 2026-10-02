@@ -12,6 +12,12 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    // Hash factice, comparé quand l'identifiant n'existe pas : Hash::check() est volontairement
+    // lent (bcrypt), donc sans cette comparaison de remplacement un identifiant inexistant
+    // répondrait beaucoup plus vite qu'un mot de passe erroné sur un compte réel - une fuite de
+    // temps qui permettrait de deviner quels comptes existent avant même de les attaquer.
+    private const HASH_FACTICE = '$2y$12$Za94TZFWB/hCA4QFXA36n.fPgj7VPVirsE96GUpoXjVzWPaSS0Ahu';
+
     public function login(LoginRequest $request)
     {
         $identifiant = $request->validated('identifiant');
@@ -22,7 +28,7 @@ class AuthController extends Controller
             ->orWhere('email', $identifiant)
             ->first();
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        if (! Hash::check($password, $user->password ?? self::HASH_FACTICE) || ! $user) {
             throw ValidationException::withMessages([
                 'identifiant' => ["Identifiants invalides."],
             ]);
@@ -36,7 +42,9 @@ class AuthController extends Controller
 
         $user->update(['last_login_at' => now()]);
 
-        $token = $user->createToken('api')->plainTextToken;
+        // Même durée que le cookie de session côté frontend (lib/session.ts) : au-delà, le
+        // jeton cesse de fonctionner tout seul, même s'il a fuité hors du navigateur.
+        $token = $user->createToken('api', ['*'], now()->addHours(10))->plainTextToken;
 
         return response()->json([
             'user' => new ProfilResource($user),

@@ -41,8 +41,8 @@ class PrescriptionTest extends TestCase
         $response = $this->postJson("/api/v1/detenus/{$detenu->id}/prescriptions", [
             'medicament' => 'Paracétamol',
             'posologie' => '500mg, 2 fois par jour',
-            'date_debut' => '2026-09-20',
-            'date_fin' => '2026-09-30',
+            'date_debut' => now()->subDays(5)->toDateString(),
+            'date_fin' => now()->addDays(5)->toDateString(),
             'prescripteur' => 'Dr Ekotto',
         ]);
 
